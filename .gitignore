@@ -12,6 +12,7 @@ override.tf.json
 *_override.tf.json
 .terraformrc
 terraform.rc
+.terraform.lock.hcl
 
 # 자격증명 관련
 *.pem
