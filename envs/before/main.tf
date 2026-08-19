@@ -46,7 +46,7 @@ module "alb_waf" {
   vpc_name          = "WHS_VPC"
   public_subnet_ids = module.vpc.public_subnet_ids
 
-  certificate_arn = ""
+  certificate_arn = "arn:aws:acm:ap-northeast-2:896986966760:certificate/e022050c-8d53-4fa5-b642-8698aef04f3f"
 }
 
 # ==============================================
@@ -91,6 +91,12 @@ module "ec2" {
   instance_type  = "t3.micro"
   instance_count = 2
   app_port       = 8080
+
+  user_data = templatefile("${path.module}/../../app/vuln-webapp/bootstrap.sh.tpl", {
+    app_py      = file("${path.module}/../../app/vuln-webapp/app.py")
+    index_html  = file("${path.module}/../../app/vuln-webapp/templates/index.html")
+    result_html = file("${path.module}/../../app/vuln-webapp/templates/result.html")
+  })
 }
 
 # ==============================================
