@@ -46,7 +46,7 @@ module "alb_waf" {
   vpc_name          = "WHS_VPC"
   public_subnet_ids = module.vpc.public_subnet_ids
 
-  certificate_arn = ""
+  certificate_arn = "arn:aws:acm:ap-northeast-2:896986966760:certificate/e022050c-8d53-4fa5-b642-8698aef04f3f"
 }
 
 # ==============================================
