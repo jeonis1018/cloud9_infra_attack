@@ -1,0 +1,6 @@
+aws_profile = "로컬 프로필 이름 입력"
+
+# before: 전부 취약한 상태
+enable_imdsv2             = false
+enable_least_privilege    = false
+allowed_vpc_endpoint_only = false
