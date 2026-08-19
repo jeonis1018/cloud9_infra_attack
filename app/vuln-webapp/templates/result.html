@@ -1,0 +1,24 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Fetch Result</title>
+    <style>
+        html, body { margin: 0; padding: 0; }
+        .header { padding: 10px; }
+        iframe { display: block; width: 100vw; height: 90vh; border: 0; }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h2>TEAM: Cloud Nine and Three-Quarters Platform</h2>
+        <p>Fetch Result for: {{ url }}</p>
+        <a href="/">Back</a>
+    </div>
+
+    {% if error %}
+    <p style="color: red; padding: 0 10px;">{{ error }}</p>
+    {% else %}
+    <iframe sandbox="" srcdoc="{{ body }}"></iframe>
+    {% endif %}
+</body>
+</html>
