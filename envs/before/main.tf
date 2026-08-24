@@ -4,6 +4,13 @@
 
 terraform {
   required_version = ">= 1.5.0"
+
+  backend "s3" {
+      bucket = "cloud943-attack-tfstate"
+      key    = "envs/before/terraform.tfstate"
+      region = "ap-northeast-2"
+  }
+  
   required_providers {
     aws = {
       source  = "hashicorp/aws"

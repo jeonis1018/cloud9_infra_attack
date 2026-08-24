@@ -123,6 +123,32 @@ resource "aws_wafv2_web_acl" "this" {
         }
     }
 
+    rule {
+        name     = "GeoBlockNonKR"
+        priority = 3   # 기존 규칙(1, 2번)과 안 겹치게
+
+        action {
+            block {}
+        }
+
+        statement {
+            not_statement {
+                statement {
+                    geo_match_statement {
+                        country_codes = ["KR"]
+                    }
+                }
+            }
+        }
+    }
+
+    visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "${var.vpc_name}-WAF-GeoBlock"
+        sampled_requests_enabled   = true
+    }
+    }
+
     visibility_config {
         cloudwatch_metrics_enabled = true
         metric_name = "${var.vpc_name}-WAF"
