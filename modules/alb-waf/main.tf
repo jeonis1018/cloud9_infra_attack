@@ -140,13 +140,12 @@ resource "aws_wafv2_web_acl" "this" {
                 }
             }
         }
-    }
 
-    visibility_config {
-        cloudwatch_metrics_enabled = true
-        metric_name                = "${var.vpc_name}-WAF-GeoBlock"
-        sampled_requests_enabled   = true
-    }
+        visibility_config {
+            cloudwatch_metrics_enabled = true
+            metric_name                = "${var.vpc_name}-WAF-GeoBlock"
+            sampled_requests_enabled   = true
+        }
     }
 
     visibility_config {
@@ -159,6 +158,7 @@ resource "aws_wafv2_web_acl" "this" {
         Name = "${var.vpc_name}-WAF"
     }
 }
+
 resource "aws_wafv2_web_acl_association" "this" {
     resource_arn = aws_lb.this.arn
     web_acl_arn = aws_wafv2_web_acl.this.arn
