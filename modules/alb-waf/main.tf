@@ -1,11 +1,11 @@
 # Security Group 생성
 resource "aws_security_group" "alb" {
     name = "${var.vpc_name}-ALB-SG"
-    description = "HTTPS 허용"
+    description = "Allow HTTPS from Internet"
     vpc_id = var.vpc_id
 
     ingress {
-        description = "HTTPS from Internet"
+        description = "Allow HTTPS from Internet"
         from_port = 443
         to_port = 443
         protocol = "tcp"
