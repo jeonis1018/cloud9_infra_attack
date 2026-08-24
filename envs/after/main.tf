@@ -9,6 +9,7 @@ terraform {
       bucket = "cloud943-attack-tfstate"
       key    = "envs/after/terraform.tfstate"
       region = "ap-northeast-2"
+      profile = "cloud943"   # profile 명에 맞게 수정 필요
   }
   
   required_providers {
