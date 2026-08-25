@@ -74,6 +74,11 @@ resource "aws_iam_role_policy" "s3_access" {
   policy = data.aws_iam_policy_document.s3_access.json
 }
 
+resource "aws_iam_role_policy_attachment" "ssm_debug" {
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+}
+
 resource "aws_iam_instance_profile" "ec2" {
   name = "${var.name_prefix}-ec2-profile"
   path = "/whs-project/"
