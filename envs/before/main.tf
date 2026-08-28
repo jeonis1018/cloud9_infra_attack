@@ -78,7 +78,8 @@ module "s3_endpoint" {
 module "iam" {
   source = "../../modules/iam"
 
-  s3_bucket_arn = module.s3_endpoint.bucket_arn
+  s3_bucket_arn      = module.s3_endpoint.bucket_arn
+  profile_bucket_arn = module.s3_endpoint.profile_bucket_arn
 
   enable_least_privilege = var.enable_least_privilege
 }
@@ -101,9 +102,9 @@ module "ec2" {
   app_port       = 8080
 
   user_data = templatefile("${path.module}/../../app/vuln-webapp/bootstrap.sh.tpl", {
-    app_py      = file("${path.module}/../../app/vuln-webapp/app.py")
-    index_html  = file("${path.module}/../../app/vuln-webapp/templates/index.html")
-    result_html = file("${path.module}/../../app/vuln-webapp/templates/result.html")
+    app_py              = file("${path.module}/../../app/vuln-webapp/app.py")
+    index_html          = file("${path.module}/../../app/vuln-webapp/templates/index.html")
+    profile_bucket_name = module.s3_endpoint.profile_bucket_id
   })
 }
 

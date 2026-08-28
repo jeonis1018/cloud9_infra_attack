@@ -54,6 +54,17 @@ data "aws_iam_policy_document" "s3_access" {
       resources = ["${var.s3_bucket_arn}/*"]
     }
   }
+
+  dynamic "statement" {
+    for_each = var.profile_bucket_arn != null ? [1] : []
+
+    content {
+      sid       = "ProfileImageBucketAccess"
+      effect    = "Allow"
+      actions   = ["s3:GetObject", "s3:PutObject", "s3:PutObjectTagging"]
+      resources = ["${var.profile_bucket_arn}/*"]
+    }
+  }
 }
 
 resource "aws_iam_role" "ec2" {
