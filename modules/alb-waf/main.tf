@@ -69,6 +69,11 @@ resource "aws_lb_listener" "https" {
   }
 }
 
+# IMDS 우회 표기 정규식 (SSRF Query/Body 규칙 공용)
+locals {
+  imds_regex = "169\\.0*254\\.0*169\\.0*254|::ffff:169\\.254\\.169\\.254|::ffff:a9fe:a9fe|fd00:0*ec2:(0*:)*0*254|2852039166|0xa9fea9fe|0xa9\\.0xfe\\.0xa9\\.0xfe|0251\\.0376\\.0251\\.0376|169\\.254\\.43518|169\\.16689662|/latest/meta-data|/latest/user-data|/latest/dynamic|/latest/api/token|identity-credentials/ec2/security-credentials"
+}
+
 # WAF Web ACL
 resource "aws_wafv2_web_acl" "this" {
   name        = "${var.vpc_name}-WAF"
@@ -137,14 +142,14 @@ resource "aws_wafv2_web_acl" "this" {
       count {}
     }
 
-    statement{
-      managed_rule_group_statement{
-        name        = "AWSManagedSQLiRuleSet"
+    statement {
+      managed_rule_group_statement {
+        name        = "AWSManagedRulesSQLiRuleSet"
         vendor_name = "AWS"
       }
     }
 
-    visibility_config{
+    visibility_config {
       cloudwatch_metrics_enabled = true
       metric_name                = "${var.vpc_name}-WAF-SQLiRuleSet"
       sampled_requests_enabled   = true
@@ -186,7 +191,7 @@ resource "aws_wafv2_web_acl" "this" {
 
     statement {
       regex_match_statement {
-        regex_string = "169\\.254\\.169\\.254|2852039166|0xa9fea9fe|0251\\.0376\\.0251\\.0376|169\\.254\\.43518|169\\.16689662|::ffff:169\\.254\\.169\\.254|fd00:ec2::254|/latest/meta-data/|/latest/meta-data$|/latest/user-data/|/latest/user-data$|/latest/dynamic/|/latest/dynamic$"
+        regex_string = local.imds_regex
 
         field_to_match {
           all_query_arguments {}
@@ -212,7 +217,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       sampled_requests_enabled   = true
       cloudwatch_metrics_enabled = true
-      metric_name                = "WHS-WAF-CustomIMDSSSRF"
+      metric_name                = "${var.vpc_name}-WAF-CustomIMDSSSRF"
     }
 
     action {
@@ -226,7 +231,7 @@ resource "aws_wafv2_web_acl" "this" {
 
     statement {
       regex_match_statement {
-        regex_string = "169\\.0*254\\.0*169\\.0*254|::ffff:169\\.254\\.169\\.254|::ffff:a9fe:a9fe|fd00:0*ec2:(0\\*:)*0*254|2852039166|0xa9fea9fe|0xa9\\.0xfe\\.0xa9\\.0xfe|0251\\.0376\\.0251\\.0376|169\\.254\\.43518|169\\.16689662|/latest/meta-data|/latest/user-data|/latest/dynamic|/latest/api/token|identity-credentials/ec2/security-credentials"
+        regex_string = local.imds_regex
 
         field_to_match {
           body {
@@ -254,7 +259,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       sampled_requests_enabled   = true
       cloudwatch_metrics_enabled = true
-      metric_name                = "WHS-WAF-CustomIMDSSSRFBody"
+      metric_name                = "${var.vpc_name}-WAF-CustomIMDSSSRFBody"
     }
 
     action {
@@ -277,7 +282,7 @@ resource "aws_wafv2_web_acl" "this" {
     visibility_config {
       sampled_requests_enabled   = true
       cloudwatch_metrics_enabled = true
-      metric_name                = "WHS-WAF-RateLimitPerIP"
+      metric_name                = "${var.vpc_name}-WAF-RateLimitPerIP"
     }
 
     action {
@@ -292,6 +297,8 @@ resource "aws_wafv2_web_acl_association" "this" {
 }
 
 # CloudWatch Logs Groups 생성
+# 콘솔에서 만든 동일 이름 로그 그룹이 이미 있으면 apply 전에 import:
+#   terraform import module.alb_waf.aws_cloudwatch_log_group.waf aws-waf-logs-cloud9-security
 resource "aws_cloudwatch_log_group" "waf" {
   name              = "aws-waf-logs-cloud9-security"
   retention_in_days = 3
@@ -302,6 +309,8 @@ resource "aws_cloudwatch_log_group" "waf" {
 }
 
 # Web ACL Logging Setting
+# 콘솔에서 이미 로깅을 켜 놨다면 apply 전에 import:
+#   terraform import module.alb_waf.aws_wafv2_web_acl_logging_configuration.this <WEBACL_ARN>
 resource "aws_wafv2_web_acl_logging_configuration" "this" {
   resource_arn = aws_wafv2_web_acl.this.arn
 
