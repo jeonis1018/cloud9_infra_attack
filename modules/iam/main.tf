@@ -28,26 +28,11 @@ resource "aws_iam_role_policy_attachment" "readonly_before" {
 }
 
 data "aws_iam_policy_document" "s3_access" {
-  dynamic "statement" {
-    for_each = var.enable_least_privilege ? [1] : []
-
-    content {
-      sid       = "ReadProfileImage"
-      effect    = "Allow"
-      actions   = ["s3:GetObject"]
-      resources = ["${var.profile_bucket_arn}/profile/current"]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = var.enable_least_privilege ? [1] : []
-
-    content {
-      sid       = "WriteProfileImage"
-      effect    = "Allow"
-      actions   = ["s3:PutObject", "s3:PutObjectTagging"]
-      resources = ["${var.profile_bucket_arn}/profile/current"]
-    }
+  statement {
+    sid       = "ProfileImageBasicAccess"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:PutObjectTagging"]
+    resources = ["${var.profile_bucket_arn}/profile/current"]
   }
 }
 
@@ -64,7 +49,6 @@ resource "aws_iam_role" "ec2" {
 }
 
 resource "aws_iam_role_policy" "s3_access" {
-  count  = var.enable_least_privilege ? 1 : 0
   name   = "${var.name_prefix}-s3-access"
   role   = aws_iam_role.ec2.id
   policy = data.aws_iam_policy_document.s3_access.json
