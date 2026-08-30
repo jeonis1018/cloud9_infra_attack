@@ -16,6 +16,12 @@ variable "allowed_vpc_endpoint_only" {
 
 variable "bucket_name_prefix" {
   type        = string
-  description = "S3 버킷 이름 접두사. 전역 유일성을 위해 뒤에 랜덤 suffix가 붙는다"
+  description = "더미데이터 버킷 이름 접두사. 전역 유일성을 위해 뒤에 랜덤 suffix가 붙는다"
   default     = "cloud9-attack-target"
+}
+
+variable "profile_bucket_name_prefix" {
+  type        = string
+  description = "프로필 이미지 버킷 이름 접두사. 전역 유일성을 위해 뒤에 랜덤 suffix가 붙는다"
+  default     = "cloud9-attack-profile"
 }
