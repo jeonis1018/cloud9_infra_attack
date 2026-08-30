@@ -9,7 +9,7 @@ terraform {
       bucket = "cloud943-attack-tfstate"
       key    = "envs/after/terraform.tfstate"
       region = "ap-northeast-2"
-      profile = "cloud943"   # profile 명에 맞게 수정 필요
+      profile = "cloud943"   # profile명에 맞게 수정 필요
   }
   
   required_providers {
@@ -78,7 +78,8 @@ module "s3_endpoint" {
 module "iam" {
   source = "../../modules/iam"
 
-  s3_bucket_arn = module.s3_endpoint.bucket_arn
+  s3_bucket_arn      = module.s3_endpoint.bucket_arn
+  profile_bucket_arn = module.s3_endpoint.profile_bucket_arn
 
   enable_least_privilege = var.enable_least_privilege
 }
@@ -99,6 +100,12 @@ module "ec2" {
   instance_type  = "t3.micro"
   instance_count = 2
   app_port       = 8080
+
+  user_data = templatefile("${path.module}/../../app/vuln-webapp/bootstrap.sh.tpl", {
+    app_py              = file("${path.module}/../../app/vuln-webapp/app.py")
+    index_html          = file("${path.module}/../../app/vuln-webapp/templates/index.html")
+    profile_bucket_name = module.s3_endpoint.profile_bucket_id
+  })
 }
 
 # ==============================================
