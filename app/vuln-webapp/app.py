@@ -12,7 +12,7 @@ app = Flask(__name__)
 
 PROFILE_BUCKET_NAME = os.environ.get("PROFILE_BUCKET_NAME", "")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
-NICKNAME = "Cloud Nine"
+NICKNAME = "Kim"
 PROFILE_KEY = "profile/current"
 
 # ap-northeast-2(서울) 리전은 SigV4만 지원. endpoint_url을 리전 엔드포인트로 고정해서
