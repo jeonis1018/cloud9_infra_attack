@@ -92,7 +92,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "AWSManagedCommonRuleSet"
-    priority = 3
+    priority = 4
 
     override_action {
       count {}
@@ -114,7 +114,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "AWSManagedKnownBadInputs"
-    priority = 4
+    priority = 5
 
     override_action {
       count {}
@@ -136,7 +136,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "AWSManagedSQLiRuleSet"
-    priority = 5
+    priority = 6
 
     override_action {
       count {}
@@ -158,7 +158,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "GeoBlockNonKR"
-    priority = 6 # 기존 규칙(1, 2번)과 안 겹치게
+    priority = 0 # 기존 규칙(1, 2번)과 안 겹치게
 
     action {
       block {}
@@ -187,7 +187,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "Custom-IMDS-SSRF-QueryArguments"
-    priority = 0
+    priority = 1
 
     statement {
       regex_match_statement {
@@ -227,7 +227,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "Custom-IMDS-SSRF-Body"
-    priority = 1
+    priority = 2
 
     statement {
       regex_match_statement {
@@ -269,7 +269,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "RateLimit-PerIP"
-    priority = 2
+    priority = 3
 
     statement {
       rate_based_statement {
