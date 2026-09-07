@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import base64
 import os
+import time
 
 import boto3
 import requests
@@ -14,6 +15,7 @@ PROFILE_BUCKET_NAME = os.environ.get("PROFILE_BUCKET_NAME", "")
 AWS_REGION = os.environ.get("AWS_REGION", "ap-northeast-2")
 NICKNAME = "Kim"
 PROFILE_KEY = "profile/current"
+PROFILE_URL_CACHE_SECONDS = 300
 
 # ap-northeast-2(서울) 리전은 SigV4만 지원. endpoint_url을 리전 엔드포인트로 고정해서
 # 서명에 쓰인 host와 실제 요청 host가 어긋나 SignatureDoesNotMatch가 나는 걸 방지
@@ -24,17 +26,28 @@ s3 = boto3.client(
     config=Config(signature_version="s3v4"),
 )
 
+_profile_url_cache = {"url": None, "expires_at": 0.0}
+
 
 def get_profile_image_url():
+    now = time.time()
+    if now < _profile_url_cache["expires_at"]:
+        return _profile_url_cache["url"]
+
     try:
         s3.head_object(Bucket=PROFILE_BUCKET_NAME, Key=PROFILE_KEY)
     except ClientError:
-        return None
-    return s3.generate_presigned_url(
-        "get_object",
-        Params={"Bucket": PROFILE_BUCKET_NAME, "Key": PROFILE_KEY},
-        ExpiresIn=3600,
-    )
+        url = None
+    else:
+        url = s3.generate_presigned_url(
+            "get_object",
+            Params={"Bucket": PROFILE_BUCKET_NAME, "Key": PROFILE_KEY},
+            ExpiresIn=3600,
+        )
+
+    _profile_url_cache["url"] = url
+    _profile_url_cache["expires_at"] = now + PROFILE_URL_CACHE_SECONDS
+    return url
 
 
 @app.route("/")
@@ -104,6 +117,7 @@ def change():
         ContentType=content_type,
         Tagging="image=true",
     )
+    _profile_url_cache["expires_at"] = 0.0
     return redirect(url_for("index"))
 
 
