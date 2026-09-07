@@ -18,6 +18,12 @@ terraform.rc
 *.pem
 *.key
 credentials
+.env
+attack/exfiltrated/
+
+# Python
+__pycache__/
+*.pyc
 
 # OS/에디터
 .DS_Store
