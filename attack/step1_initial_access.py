@@ -4,7 +4,7 @@ SSRF(GET /preview?url=) 를 통해 IMDS에 접근, EC2 임시 자격증명을 �
 
 단독 실행:
     python step1_initial_access.py
-    python step1_initial_access.py --alb-url https://xxxx.elb.amazonaws.com
+    python step1_initial_access.py --webapp-url https://xxxx.elb.amazonaws.com
 """
 
 import argparse

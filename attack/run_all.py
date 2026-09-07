@@ -187,7 +187,7 @@ def main():
 
     # ── Step 4 ────────────────────────────────────────────────────
     if args.start_step <= 4:
-        _banner(4, "Defense Evasion (CloudTrail + GuardDuty 비활성화)")
+        _banner(4, "Defense Evasion (GuardDuty 비활성화)")
         import step4_defense_evasion
         try:
             step4_result = step4_defense_evasion.run(
