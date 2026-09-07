@@ -7,7 +7,8 @@ import boto3
 from botocore.config import Config
 from botocore.exceptions import ClientError
 
-LOOKBACK_MINUTES = int(os.environ.get("LOOKBACK_MINUTES", "5"))
+# 30분: CloudTrail은 최대 15분 지연 조회라 5분이면 누락 (eventID 중복제거로 안전)
+LOOKBACK_MINUTES = int(os.environ.get("LOOKBACK_MINUTES", "30"))
 ALERT_BUCKET = os.environ["ALERT_BUCKET"]
 ALERT_PREFIX = os.environ.get(
   "ALERT_PREFIX",
@@ -32,7 +33,92 @@ TARGET_EVENT_NAMES = [
     "UpdateTrail",
     "PutEventSelectors",
     "PutInsightSelectors",
+    # ↓ 추가: GuardDuty 무력화 (# 줄은 구분용 주석일 뿐, 아래 4개 전부 활성 탐지 대상)
+    "UpdateDetector",    # enable=false = 탐지 중단 — 이번 공격 시나리오에서 실제 사용됨
+    "DeleteDetector",    # 디텍터 삭제 (복구 불가)
+    # ↓ 추가: GuardDuty Finding 은폐 — 탐지는 살려두고 경보만 숨기는 행위
+    "CreateFilter",
+    "UpdateFilter",
 ]
+
+
+def classify_event(event_name, request_parameters):
+    """
+    이벤트 + 파라미터 조합으로 위험도와 행위 종류를 판정한다.
+    반환: {"severity": int, "action_kind": str, "note": str | None}
+
+    action_kind: DISABLE | ENABLE | DELETE | MODIFY | SUPPRESS
+    severity: 1~10
+
+    enable=true(켜기) 이벤트도 버리지 않고 severity만 낮게 부여한다.
+    공격자가 GuardDuty를 껐다 켜서 흔적을 은폐하는 기법(anti-forensics)에서
+    켜기 기록이 없으면 감시 공백 구간(blind window)을 계산할 수 없다.
+    """
+    request_parameters = request_parameters or {}
+
+    if event_name == "UpdateDetector":
+        enable = request_parameters.get("enable")
+        if enable is False:
+            return {
+                "severity": 9,
+                "action_kind": "DISABLE",
+                "note": "GuardDuty 탐지 중단",
+            }
+        if enable is True:
+            return {
+                "severity": 5,
+                "action_kind": "ENABLE",
+                "note": "재활성화 — HITL 승인 기록과 대조 필요",
+            }
+        # enable 파라미터 없음 = features/dataSources 등 부분 설정 변경
+        return {
+            "severity": 7,
+            "action_kind": "MODIFY",
+            "note": "부분 설정 변경 — 개별 기능 비활성화 가능성",
+        }
+
+    if event_name == "UpdateTrail":
+        # 로깅 범위를 축소하는 변경만 고위험
+        narrowing = (
+            request_parameters.get("includeGlobalServiceEvents") is False
+            or request_parameters.get("isMultiRegionTrail") is False
+            or request_parameters.get("enableLogFileValidation") is False
+        )
+        return {
+            "severity": 8 if narrowing else 5,
+            "action_kind": "DISABLE" if narrowing else "MODIFY",
+            "note": "로깅 범위 축소" if narrowing else "Trail 설정 변경",
+        }
+
+    if event_name in ("DeleteTrail", "DeleteDetector"):
+        return {
+            "severity": 10,
+            "action_kind": "DELETE",
+            "note": "복구 불가 — 즉시 대응 필요",
+        }
+
+    if event_name == "StopLogging":
+        return {
+            "severity": 9,
+            "action_kind": "DISABLE",
+            "note": "CloudTrail 로깅 중단",
+        }
+
+    if event_name in ("CreateFilter", "UpdateFilter"):
+        return {
+            "severity": 6,
+            "action_kind": "SUPPRESS",
+            "note": "Finding 억제 규칙 — 정상 오탐 억제일 수 있음",
+        }
+
+    if event_name in ("PutEventSelectors", "PutInsightSelectors"):
+        return {
+            "severity": 7,
+            "action_kind": "MODIFY",
+            "note": "로깅 대상 셀렉터 변경",
+        }
+
+    return {"severity": 5, "action_kind": "MODIFY", "note": None}
 
 def lookup_events(event_name, start_time, end_time):
     detected_events = []
@@ -96,6 +182,11 @@ def lookup_events(event_name, start_time, end_time):
         for event in response.get("Events", []):
             raw_event = json.loads(event["CloudTrailEvent"])
 
+            classification = classify_event(
+                raw_event.get("eventName"),
+                raw_event.get("requestParameters"),
+            )
+
             detected_events.append(
                 {
                     "event_time": raw_event.get("eventTime"),
@@ -110,6 +201,15 @@ def lookup_events(event_name, start_time, end_time):
                     "request_parameters": raw_event.get("requestParameters"),
                     "error_code": raw_event.get("errorCode"),
                     "error_message": raw_event.get("errorMessage"),
+                    "severity": classification["severity"],
+                    "action_kind": classification["action_kind"],
+                    "classification_note": classification["note"],
+                    "target_service": (
+                        "guardduty"
+                        if "Detector" in (raw_event.get("eventName") or "")
+                        or "Filter" in (raw_event.get("eventName") or "")
+                        else "cloudtrail"
+                    ),
                 }
             )
 
