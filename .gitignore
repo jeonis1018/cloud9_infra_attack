@@ -20,6 +20,7 @@ terraform.rc
 credentials
 .env
 attack/exfiltrated/
+attack/venv/
 
 # Python
 __pycache__/
