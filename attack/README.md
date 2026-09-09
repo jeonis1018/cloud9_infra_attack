@@ -1,6 +1,6 @@
 # Cloud9 Attack Chain
 
-Capital One 2019 침해 사고를 재현하는 5단계 공격 시나리오.
+클라우드 취약 아키텍처 5단계 공격 시나리오.
 
 ```
 SSRF → IMDS 자격증명 탈취 → 정찰 → 데이터 유출 → 탐지 회피 → SSE-C 재암호화
@@ -239,3 +239,67 @@ attack/
 
 `run_all.py`로 전체 실행 시 `attack/attack_chain.log`에 전체 로그가 기록된다.  
 단계별 단독 실행 시에는 표준 출력으로만 확인 가능하다.
+
+---
+
+## 공격 후 원상복구
+
+시나리오 종료 후 아래 순서로 복구한다.
+
+### 1. GuardDuty 재활성화 (Step 4 복구)
+
+Step 4에서 비활성화한 GuardDuty 탐지기를 다시 활성화한다.
+
+```bash
+# 탐지기 ID 확인
+aws guardduty list-detectors --region ap-northeast-2
+
+# 탐지기 재활성화
+aws guardduty update-detector \
+    --region ap-northeast-2 \
+    --detector-id <detector-id> \
+    --enable
+```
+
+### 2. S3 객체 복원 (Step 5 복구)
+
+Step 5에서 SSE-C로 재암호화된 객체를 원래 상태로 되돌린다.  
+`envs/before/` (또는 `envs/after/`) 에서 Terraform을 재적용하면 `aws_s3_object.dummy_data` 리소스가 원본 파일을 덮어쓴다.
+
+```bash
+cd envs/before
+terraform apply
+```
+
+> Terraform apply 없이 수동 복원이 필요한 경우, SSE-C 복호화에 `attack/exfiltrated/sse_c.key`가 필요하다. 키 파일을 분실했다면 수동 복원 불가 — Terraform apply로만 복구 가능하다.
+
+### 3. SSE-C 차단 설정 복원 (Step 5 복구)
+
+Step 5에서 SSE-C 차단이 해제된 경우(`ssec_block_removed: true`), 버킷 암호화 설정을 원래대로 되돌린다.
+
+```bash
+aws s3api put-bucket-encryption \
+    --region ap-northeast-2 \
+    --bucket <target-bucket-name> \
+    --server-side-encryption-configuration '{
+        "Rules": [{
+            "ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"},
+            "BucketKeyEnabled": false,
+            "BlockedEncryptionTypes": {"EncryptionType": ["SSE-C"]}
+        }]
+    }'
+```
+
+> Step 5 실행 결과의 `ssec_block_removed` 값이 `false`이면 원래 차단 설정이 없었던 것이므로 이 단계는 건너뛴다.
+
+### 4. 로컬 파일 정리
+
+공격 중 생성된 로컬 파일을 삭제한다.
+
+```bash
+# 유출 파일 및 SSE-C 키 삭제
+rm -rf attack/exfiltrated/
+
+# 공격 로그 삭제
+rm -f attack/attack_chain.log
+```

@@ -182,12 +182,15 @@ def main():
         step3_result["iam_user_creds"]["SecretAccessKey"] = env_secret
         if env_user:
             step3_result["iam_user_creds"]["IAMUser"] = env_user
+    elif args.start_step <= 3:
+        log.error("[!] IAM User 자격증명 미설정 — attack/.env 에 IAM_ACCESS_KEY_ID / IAM_SECRET_ACCESS_KEY 를 입력하세요")
+        sys.exit(1)
 
     iam_creds = step3_result["iam_user_creds"]
 
     # ── Step 4 ────────────────────────────────────────────────────
     if args.start_step <= 4:
-        _banner(4, "Defense Evasion (CloudTrail + GuardDuty 비활성화)")
+        _banner(4, "Defense Evasion (GuardDuty 비활성화)")
         import step4_defense_evasion
         try:
             step4_result = step4_defense_evasion.run(
