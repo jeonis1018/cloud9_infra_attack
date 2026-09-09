@@ -24,6 +24,46 @@ logging.basicConfig(level=logging.INFO, format="[%(levelname)s] %(message)s")
 log = logging.getLogger(__name__)
 
 
+def _discover_iam_user(session: boto3.Session) -> dict:
+    result = {"caller_identity": {}, "attached_policies": [], "policy_documents": {}}
+
+    # 1. 이 자격증명이 누구 건지 확인
+    try:
+        sts = session.client("sts")
+        identity = sts.get_caller_identity()
+        result["caller_identity"] = {
+            "UserId":  identity.get("UserId"),
+            "Account": identity.get("Account"),
+            "Arn":     identity.get("Arn"),
+        }
+        log.info("  [IAM-User] CallerIdentity: %s", identity.get("Arn"))
+    except ClientError as e:
+        log.warning("  get_caller_identity 실패: %s", e)
+
+    # 2. 붙어있는 관리형 정책 목록 확인
+    iam = session.client("iam")
+    try:
+        resp = iam.list_attached_user_policies(UserName=config.IAM_USER_NAME)
+        for p in resp.get("AttachedPolicies", []):
+            result["attached_policies"].append({"name": p["PolicyName"], "arn": p["PolicyArn"]})
+            log.info("  [IAM-User] 관리형 정책: %s (%s)", p["PolicyName"], p["PolicyArn"])
+    except ClientError as e:
+        log.warning("  list_attached_user_policies 실패: %s", e)
+
+    # 3. 각 정책의 기본 버전 확인 후 실제 내용 조회
+    for policy in result["attached_policies"]:
+        arn = policy["arn"]
+        try:
+            ver_id = iam.get_policy(PolicyArn=arn)["Policy"]["DefaultVersionId"]
+            doc = iam.get_policy_version(PolicyArn=arn, VersionId=ver_id)["PolicyVersion"]["Document"]
+            result["policy_documents"][policy["name"]] = {"version": ver_id, "document": doc}
+            log.info("  [IAM-User] 정책 내용 확인: %s (%s)", policy["name"], ver_id)
+        except ClientError as e:
+            log.warning("  정책 내용 조회 실패 (%s): %s", arn, e)
+
+    return result
+
+
 def _disable_guardduty(session: boto3.Session) -> dict:
     gd = session.client("guardduty", region_name=config.REGION)
     result = {"detectors_disabled": [], "errors": []}
@@ -68,9 +108,10 @@ def run(iam_access_key: str, iam_secret_key: str) -> dict:
         region_name=config.REGION,
     )
 
+    iam_user_info = _discover_iam_user(session)
     gd_result = _disable_guardduty(session)
 
-    result = {"guardduty": gd_result}
+    result = {"iam_user_discovery": iam_user_info, "guardduty": gd_result}
     log.info("[Step 4 완료] GuardDuty 비활성화: %s", gd_result["detectors_disabled"])
     return result
 
