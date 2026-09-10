@@ -85,85 +85,19 @@ def normalize(record, log_group, log_stream, log_event_id):
                                             .get("mfaAuthenticated"),
         "is_aws_internal": bool(source_ip and source_ip.endswith(".amazonaws.com")),
         "read_only": record.get("readOnly"),
-        "event_type": record.get("eventType"),
-        "event_category": record.get("eventCategory"),
-        "api_key": f"{record.get('eventSource')}:{record.get('eventName')}",
         "error_message": record.get("errorMessage"),
         "request_parameters": pick_params(record.get("requestParameters")),
-        "resources": record.get("resources"),
         "severity": None,
-        "label": None,
-        "mitre_technique": None,
-        "ai_verdict": None,
-    }
-
-
-def normalize_guardduty(record, log_group, log_stream, log_event_id):
-    """GuardDuty Finding(EventBridge 이벤트)을 CloudTrail과 같은 v1.1 스키마로 매핑."""
-    detail = record.get("detail", {})
-    resource = detail.get("resource", {})
-    access_key = resource.get("accessKeyDetails", {})
-    action = detail.get("service", {}).get("action", {}).get("awsApiCallAction", {})
-    source_ip = action.get("remoteIpDetails", {}).get("ipAddressV4")
-    error_code = action.get("errorCode") or None
-
-    gd_params = {
-        "detectorId": detail.get("service", {}).get("detectorId"),
-        "name": access_key.get("userName"),
-    }
-
-    return {
-        "schema_version": "1.1",
-        "event_time": detail.get("updatedAt") or record.get("time"),
-        "event_id": detail.get("id") or log_event_id,
-        "event_source": record.get("source"),
-        "event_name": detail.get("type"),
-        "account_id": detail.get("accountId"),
-        "region": detail.get("region"),
-        "principal_arn": access_key.get("principalId"),
-        "access_key": access_key.get("accessKeyId"),
-        "source_ip": source_ip,
-        "user_agent": None,
-        "status": "FAIL" if error_code else "SUCCESS",
-        "error_code": error_code,
-        "raw_log_location": (
-            f"cloudwatch://{log_group}/{log_stream}/{log_event_id}"
-        ),
-        "user_type": access_key.get("userType"),
-        "mfa_authenticated": None,
-        "is_aws_internal": bool(source_ip and source_ip.endswith(".amazonaws.com")),
-        "read_only": None,
-        "event_type": record.get("detail-type"),
-        "event_category": detail.get("service", {}).get("featureName"),
-        "api_key": (
-            f"{action.get('serviceName')}:{action.get('api')}"
-            if action.get("api") else None
-        ),
-        "error_message": detail.get("description"),
-        "request_parameters": pick_params(
-            {k: v for k, v in gd_params.items() if v is not None}
-        ),
-        "resources": [{
-            "resourceType": resource.get("resourceType"),
-            "instanceId": resource.get("instanceDetails", {}).get("instanceId"),
-        }] if resource else None,
-        "severity": detail.get("severity"),
-        "label": None,
-        "mitre_technique": None,
-        "ai_verdict": None,
     }
 
 
 def partition_path(event_time_str, fallback):
     """event_time(ISO8601 Z) 기준 Hive 스타일 파티션 경로."""
-    # CloudTrail은 초 단위(...22Z), GuardDuty는 밀리초 단위(...57.988Z) — 둘 다 지원
-    for fmt in ("%Y-%m-%dT%H:%M:%SZ", "%Y-%m-%dT%H:%M:%S.%fZ"):
-        try:
-            dt = datetime.strptime(event_time_str, fmt) \
-                         .replace(tzinfo=timezone.utc)
-            break
-        except (TypeError, ValueError):
-            dt = fallback
+    try:
+        dt = datetime.strptime(event_time_str, "%Y-%m-%dT%H:%M:%SZ") \
+                     .replace(tzinfo=timezone.utc)
+    except (TypeError, ValueError):
+        dt = fallback
     return f"year={dt:%Y}/month={dt:%m}/day={dt:%d}/hour={dt:%H}"
 
 
@@ -209,21 +143,12 @@ def lambda_handler(event, context):
         try:
             cloudtrail_record = json.loads(log_event["message"])
 
-            # GuardDuty Finding(EventBridge 봉투)은 구조가 달라 전용 매핑으로 분기
-            if cloudtrail_record.get("detail-type") == "GuardDuty Finding":
-                normalized = normalize_guardduty(
-                    record=cloudtrail_record,
-                    log_group=payload.get("logGroup"),
-                    log_stream=payload.get("logStream"),
-                    log_event_id=log_event.get("id")
-                )
-            else:
-                normalized = normalize(
-                    record=cloudtrail_record,
-                    log_group=payload.get("logGroup"),
-                    log_stream=payload.get("logStream"),
-                    log_event_id=log_event.get("id")
-                )
+            normalized = normalize(
+                record=cloudtrail_record,
+                log_group=payload.get("logGroup"),
+                log_stream=payload.get("logStream"),
+                log_event_id=log_event.get("id")
+            )
 
             normalized_events.append(normalized)
 
