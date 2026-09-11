@@ -9,10 +9,21 @@
 import base64
 import gzip
 import json
+import os
 from datetime import datetime, timezone
+
+import boto3
+
+s3 = boto3.client("s3")
 
 SCHEMA_VERSION = "2.0"
 LOG_TYPE = "cloudtrail"
+
+NORMALIZED_BUCKET = os.environ["NORMALIZED_BUCKET"]
+NORMALIZED_PREFIX = os.environ.get(
+  "NORMALIZED_PREFIX",
+  "cloudtrail"
+).strip("/")
 
 def utc_now():
   # 현재 UTC 시간을 ISO 8601 형식으로 변환한다.예: 2026-09-10T01:20:30.123456Z
@@ -208,6 +219,56 @@ def normalize(record, collection_path, collection_source, collector,
     }
   }
 
+def save_normalized_events(normalized_events):
+  # 정규화된 이벤트를 이벤트 ID 별로 S3에 저장한다. eventID를 객체 키에 사용하므로, 
+  # 정상 경로와 우회 경로에서 같은 이벤트가 들어와도 동일한 객체를 다시 작성하게 된다 
+  now = datetime.now(timezone.utc)
+
+  saved_keys = []
+
+  for normalized_event in normalized_events:
+    event_id = (normalized_event.get("event",{}).get("id"))
+
+    if not event_id:
+      print( 
+        json.dumps(
+          {
+            "level": "ERROR",
+            "message": (
+                "Cannot save event without event ID"
+            ),
+          },
+          ensure_ascii=False,
+        )
+      )
+      continue
+
+    object_key = (
+        f"{NORMALIZED_PREFIX}/"
+        f"year={now:%Y}/"
+        f"month={now:%m}/"
+        f"day={now:%d}/"
+        f"hour={now:%H}/"
+        f"{event_id}.json"
+    )
+
+    body = json.dumps(
+      normalized_event,
+      ensure_ascii = False,
+      indent = 2,
+    )
+
+    s3.put_object(
+      Bucket = NORMALIZED_BUCKET,
+      Key = object_key,
+      Body = body.encode("utf-8"),
+      ContentType = "application/json",
+      ServerSideEncryption = "AES256",
+    )
+
+    saved_keys.append(object_key)
+  return saved_keys
+
 # CloudWatch Logs 구독 필터 입력을 처리한다 
 def handle_cloudwatch_logs(event, context):
   compressed_data = base64.b64decode(event["awslogs"]["data"])
@@ -287,14 +348,16 @@ def handle_cloudwatch_logs(event, context):
             ensure_ascii=False,
           )
         )
-    return {
-      "statusCode": 200,
-      "normalized_count": len(normalized_events),
-      "failed_count": failed_count,
-      # 이 부분은 단독 테스트를 위해서 임시로 반환.
-      # 공통 처리 Lambda 연결 시 제거 가능 
-      "normalized_events": normalized_events
-    }
+  saved_keys = save_normalized_events(normalized_events)
+    
+  return {
+    "statusCode": 200,
+    "normalized_count": len(normalized_events),
+    "failed_count": failed_count,
+    "saved_count": len(saved_keys),
+    "saved_keys": saved_keys,
+  }
+
 
 def handle_event_history(event, context):
   # detect trail Lambda가 전달한 Event Histroy 입력을 처리한다 
@@ -319,12 +382,13 @@ def handle_event_history(event, context):
     )
   )
 
+  saved_keys = save_normalized_events([normalized])
+
   return{
     "statusCode": 200,
     "normalized_count": 1,
-    # 이 부분은 단독 테스트를 위해서 임시로 반환.
-    # 공통 처리 Lambda 연결 시 제거 가능 
-    "normalized_events": [normalized]
+    "saved_count": len(saved_keys),
+    "saved_keys": saved_keys,
   }
 
 def lambda_handler(event, context):
