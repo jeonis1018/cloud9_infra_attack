@@ -151,6 +151,7 @@ def invoke_normalizer(record, lookup_event_id):
   # 정규화 Lambda에 Event History 형식의 입력을 전달한다
 
   payload = {
+    "input_type": "cloudtrail_event_history",
     "record": record,  # 파싱된 실제 CloudTrail 로그 본준
     "lookup_event_id": lookup_event_id,
   }

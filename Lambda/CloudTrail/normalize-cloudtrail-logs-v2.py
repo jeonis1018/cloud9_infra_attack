@@ -212,7 +212,7 @@ def normalize(record, collection_path, collection_source, collector,
       "log_event_id": log_event_id
     },
 
-    "detail":{
+    "details":{
       "request_parameters": (record.get("requestParameters") or {}),
       "response_elements": (record.get("responseElements") or {}),
       "additional_event_data": (record.get("additionalEventData") or {})
