@@ -15,11 +15,13 @@ from datetime import datetime, timezone
 import boto3
 
 s3 = boto3.client("s3")
+lambda_client = boto3.client("lambda")
 
 SCHEMA_VERSION = "2.0"
 LOG_TYPE = "cloudtrail"
 
 NORMALIZED_BUCKET = os.environ["NORMALIZED_BUCKET"]
+DETECTOR_FUNCTION_NAME = os.environ["DETECTOR_FUNCTION_NAME"]
 NORMALIZED_PREFIX = os.environ.get(
   "NORMALIZED_PREFIX",
   "cloudtrail"
@@ -269,6 +271,48 @@ def save_normalized_events(normalized_events):
     saved_keys.append(object_key)
   return saved_keys
 
+def invoke_detector_for_saved_events(normalized_events, saved_keys):
+  # S3에 저장된 이벤트만 detect_security_rules Lambda에 1건씩 비동기로 전달한다 
+  if len(normalized_events) != len(saved_keys):
+    raise ValueError("Saved event count does not match normalized event count")
+
+  invoked_count = 0
+
+  # 정규화된 이벤트 객체(normalized_event)와 해당 이벤트가 저장된 S3 위치 정보(saved_key)를 
+  # 묶어서 다음 Lambda가 수신할 JSON 페이로드를 만든다 
+  for normalized_event, saved_key in zip(normalized_events, saved_keys):
+    event_id = normalized_event["event"]["id"]
+    payload = {
+      "normalized_event": normalized_event,
+      "normalized_s3": {
+        "bucket": NORMALIZED_BUCKET,
+        "key": saved_key,
+      },
+    }
+
+    response = lambda_client.invoke(
+      FunctionName = DETECTOR_FUNCTION_NAME,
+      InvocationType = "Event",
+      Payload = json.dumps(payload, ensure_ascii=False).encode("utf-8")
+    )
+
+    # AWS 규격상 비동기 호출 요청이 정상 접수 되면 202코드를 반환한다 
+    # 비동기 요청 접수 실패 시 RuntimeError가 발생한다 
+    if response.get("StatusCode") != 202:
+      raise RuntimeError(
+        f"Detector invocation not accepted for event {event_id}:"
+        f"{response.get('StatusCode')}"
+      )
+
+    invoked_count += 1
+    print(json.dumps({
+      "message": "Detector invocation accepted",
+      "event_id": event_id,
+      "status_code": 202,
+    }, ensure_ascii=False))
+
+  return invoked_count
+
 # CloudWatch Logs 구독 필터 입력을 처리한다 
 def handle_cloudwatch_logs(event, context):
   compressed_data = base64.b64decode(event["awslogs"]["data"])
@@ -349,12 +393,14 @@ def handle_cloudwatch_logs(event, context):
           )
         )
   saved_keys = save_normalized_events(normalized_events)
+  invoked_count = invoke_detector_for_saved_events(normalized_events, saved_keys)
     
   return {
     "statusCode": 200,
     "normalized_count": len(normalized_events),
     "failed_count": failed_count,
     "saved_count": len(saved_keys),
+    "invoked_count": invoked_count,
     "saved_keys": saved_keys,
   }
 
@@ -383,11 +429,13 @@ def handle_event_history(event, context):
   )
 
   saved_keys = save_normalized_events([normalized])
+  invoked_count = invoke_detector_for_saved_events([normalized], saved_keys)
 
   return{
     "statusCode": 200,
     "normalized_count": 1,
     "saved_count": len(saved_keys),
+    "invoked_count": invoked_count,
     "saved_keys": saved_keys,
   }
 
@@ -399,4 +447,4 @@ def lambda_handler(event, context):
   if (event.get("input_type") == "cloudtrail_event_history"):
     return handle_event_history(event, context)
 
-  raise ValueError("Unsuported Lambda input type")
+  raise ValueError("Unsupported Lambda input type")
