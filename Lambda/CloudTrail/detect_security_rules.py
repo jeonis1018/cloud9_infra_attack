@@ -384,33 +384,6 @@ def save_evaluation_result(normalized_event, evaluation):
 
   return object_key
 
-def lambda_handler(event, context):
-  # normalized_event가 있으면 벗겨내고, 없으면 정규화 본문으로 간주 
-  normalized_event = extract_normalized_event(event)
-  # normalized_event 검증 함수 
-  validate_normalized_event(normalized_event)
-
-  # 위험도 분석
-  evaluation = evaluate_security_event(normalized_event)
-
-  # S3 경로 설계 및 영구 적재 
-  saved_key = save_evaluation_result(normalized_event, evaluation)
-
-  result = {
-    "statusCode": 200,
-    "event_id": normalized_event["event"]["id"],
-    "classification": evaluation["classification"],
-    "risk_score": evaluation["risk_score"],
-    "severity": evaluation["severity"],
-    "rule_id": evaluation["rule_id"],
-    "saved_bucket": RESULT_BUCKET,
-    "saved_key": saved_key,
-  }
-
-  print(json.dumps(result, ensure_ascii=False))
-  
-  return result
-
 
 # ---------------------------------------------------------------------------
 # S3 단일 이벤트 룰
@@ -698,7 +671,7 @@ def evaluate_s3_event(normalized_event):
     action = event["action"]
     object_action = action in {"PutObjectAcl", "DeleteObject", "DeleteObjects", "GetObject"}
     protected_objects = [(bucket, key) for bucket, key in objects
-                         if s3_object_is_protected(bucket, key)]
+                        if s3_object_is_protected(bucket, key)]
     if object_action:
         # 전체 보호 버킷이면 객체 키가 생략된 CloudTrail 이벤트도 REVIEW 대상으로 유지.
         protected = bool(protected_objects) or any(bucket in PROTECTED_BUCKETS for bucket in buckets)
@@ -796,3 +769,34 @@ def evaluate_security_event(normalized_event):
     if normalized_event["event"]["service"] == "s3.amazonaws.com":
         return evaluate_s3_event(normalized_event)
     return evaluate_cloudtrail_event(normalized_event)
+
+
+def lambda_handler(event, context):
+  # normalized_event가 있으면 벗겨내고, 없으면 정규화 본문으로 간주 
+  normalized_event = extract_normalized_event(event)
+  # normalized_event 검증 함수 
+  validate_normalized_event(normalized_event)
+
+  # 위험도 분석
+  evaluation = evaluate_security_event(normalized_event)
+
+  # S3 경로 설계 및 영구 적재 
+  saved_key = save_evaluation_result(normalized_event, evaluation)
+
+  result = {
+    "statusCode": 200,
+    "event_id": normalized_event["event"]["id"],
+    "classification": evaluation["classification"],
+    "risk_score": evaluation["risk_score"],
+    "severity": evaluation["severity"],
+    "rule_id": evaluation["rule_id"],
+    "saved_bucket": RESULT_BUCKET,
+    "saved_key": saved_key,
+  }
+
+  print(json.dumps(result, ensure_ascii=False))
+  
+  return result
+
+
+
