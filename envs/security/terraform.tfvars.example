@@ -1,0 +1,6 @@
+aws_profile        = "cloud943"
+attack_environment = "before"
+
+# Review the trusted CIDR list in variables.tf before applying.
+# permissions_boundary_arn = "arn:aws:iam::896986966760:policy/WHSProjectRoleBoundary"
+

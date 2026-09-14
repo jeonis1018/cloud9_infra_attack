@@ -1,0 +1,9 @@
+.build/*
+!.build/.gitkeep
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+terraform.tfvars
+crash.log
+!.terraform.lock.hcl
