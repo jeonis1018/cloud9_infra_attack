@@ -11,7 +11,7 @@ resource "aws_cloudwatch_log_subscription_filter" "security_events" {
   name            = "cloud9-security-events-to-normalizer"
   log_group_name  = aws_cloudwatch_log_group.cloudtrail.name
   destination_arn = aws_lambda_function.normalizer.arn
-  filter_pattern  = "{ ($.eventSource = \"cloudtrail.amazonaws.com\") || ($.eventSource = \"s3.amazonaws.com\") || ($.eventSource = \"ec2.amazonaws.com\") || ($.eventSource = \"iam.amazonaws.com\") || ($.eventSource = \"sts.amazonaws.com\") || ($.eventSource = \"signin.amazonaws.com\") || ($.eventSource = \"ssm.amazonaws.com\") }"
+  filter_pattern  = "{ ($.eventSource = \"guardduty.amazonaws.com\") || ($.eventSource = \"cloudtrail.amazonaws.com\") || ($.eventSource = \"s3.amazonaws.com\") || ($.eventSource = \"ec2.amazonaws.com\") || ($.eventSource = \"iam.amazonaws.com\") || ($.eventSource = \"sts.amazonaws.com\") || ($.eventSource = \"signin.amazonaws.com\") || ($.eventSource = \"ssm.amazonaws.com\") }"
 
   depends_on = [aws_lambda_permission.from_cloudwatch_logs]
 }

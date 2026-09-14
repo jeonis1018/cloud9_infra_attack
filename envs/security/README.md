@@ -47,3 +47,26 @@ Then run a **non-destructive** CloudTrail management action and check normalizer
 - Terraform syntax and Python unit tests are validated locally; live AWS `plan`, `apply`, and end-to-end delivery still require working target-account credentials and populated attack-stack remote-state outputs.
 - S3-010 (SSE-C object write/copy detection) is reserved but disabled; CloudTrail metadata alone does not prove a successful ransomware-style overwrite. Approval exceptions and automatic remediation are not implemented. A `FINDING` means a rule matched, not that an incident is confirmed.
 - Lambda asynchronous invocation acceptance is not proof that the detector completed; monitor both Lambda error metrics and the S3 result object.
+
+## Shared detector wiring (2026-09-15)
+
+The detector ZIP now contains `lambda_function.py` (router), `cloudtrail_s3_rules.py`
+(the unchanged CloudTrail/S3 implementation), and `guardduty_rules.py` (extracted
+from the locally available origin/main). The 32 divergent commits were not merged.
+CloudTrail normalizer still uses DETECTOR_FUNCTION_NAME; GuardDuty normalizer uses
+RULES_FUNCTION_NAME. Both send {"normalized_event": ...} with schema_version 2.0.
+
+GuardDuty Finding -> EventBridge -> CloudWatch Logs -> GuardDuty normalizer -> shared
+detector -> guardduty/{normal,review,findings}. GuardDuty management API events keep
+log_type=cloudtrail and route by event.service=guardduty.amazonaws.com to the
+GuardDuty tampering evaluator. CloudTrail/S3 evaluation and paths remain unchanged.
+
+GuardDuty detector enablement is a prerequisite, not created here. Delivery is in
+ap-northeast-2 only. Import already existing module resources before apply; do not
+manage the same GuardDuty delivery resources from another Terraform state.
+Run terraform init -backend=false for offline validation after adding the module;
+backend authentication and remote-state checks are still needed before plan/apply.
+The five-minute Event History fallback still covers only the five CloudTrail actions.
+GuardDuty normalizer currently logs invocation failures without raising; no DLQ or
+end-to-end AWS delivery verification has been added. GuardDuty rule thresholds and
+filter semantics were retained and require the owner's review before deployment.

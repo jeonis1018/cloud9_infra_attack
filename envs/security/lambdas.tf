@@ -7,11 +7,21 @@ data "archive_file" "normalizer" {
 }
 
 data "archive_file" "detector" {
-  type                    = "zip"
-  output_path             = "${path.module}/.build/detector.zip"
-  output_file_mode        = "0644"
-  source_content          = file("${path.module}/../../Lambda/CloudTrail/detect_security_rules.py")
-  source_content_filename = "lambda_function.py"
+  type             = "zip"
+  output_path      = "${path.module}/.build/detector.zip"
+  output_file_mode = "0644"
+  source {
+    content  = file("${path.module}/../../Lambda/Security/lambda_function.py")
+    filename = "lambda_function.py"
+  }
+  source {
+    content  = file("${path.module}/../../Lambda/CloudTrail/detect_security_rules.py")
+    filename = "cloudtrail_s3_rules.py"
+  }
+  source {
+    content  = file("${path.module}/../../Lambda/GuardDuty/detect_guardduty_rules.py")
+    filename = "guardduty_rules.py"
+  }
 }
 
 data "archive_file" "tampering" {
@@ -67,6 +77,9 @@ resource "aws_iam_role_policy" "detector" {
         "${aws_s3_bucket.results.arn}/cloudtrail/normal/*",
         "${aws_s3_bucket.results.arn}/cloudtrail/review/*",
         "${aws_s3_bucket.results.arn}/cloudtrail/findings/*",
+        "${aws_s3_bucket.results.arn}/guardduty/normal/*",
+        "${aws_s3_bucket.results.arn}/guardduty/review/*",
+        "${aws_s3_bucket.results.arn}/guardduty/findings/*",
       ]
     }]
   })
@@ -84,15 +97,18 @@ resource "aws_lambda_function" "detector" {
 
   environment {
     variables = {
-      RESULT_BUCKET         = aws_s3_bucket.results.id
-      NORMAL_PREFIX         = "cloudtrail/normal"
-      REVIEW_PREFIX         = "cloudtrail/review"
-      FINDING_PREFIX        = "cloudtrail/findings"
-      PROTECTED_TRAILS      = jsonencode([local.trail_name])
-      PROTECTED_BUCKETS     = jsonencode([local.attack_bucket_name])
-      PROTECTED_S3_PREFIXES = "{}"
-      PROTECTED_S3_OBJECTS  = "[]"
-      TEAM_CIDRS            = jsonencode(var.team_cidrs)
+      GUARDDUTY_NORMAL_PREFIX  = "guardduty/normal"
+      GUARDDUTY_REVIEW_PREFIX  = "guardduty/review"
+      GUARDDUTY_FINDING_PREFIX = "guardduty/findings"
+      RESULT_BUCKET            = aws_s3_bucket.results.id
+      NORMAL_PREFIX            = "cloudtrail/normal"
+      REVIEW_PREFIX            = "cloudtrail/review"
+      FINDING_PREFIX           = "cloudtrail/findings"
+      PROTECTED_TRAILS         = jsonencode([local.trail_name])
+      PROTECTED_BUCKETS        = jsonencode([local.attack_bucket_name])
+      PROTECTED_S3_PREFIXES    = "{}"
+      PROTECTED_S3_OBJECTS     = "[]"
+      TEAM_CIDRS               = jsonencode(var.team_cidrs)
     }
   }
 
