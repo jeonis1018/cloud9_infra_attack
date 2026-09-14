@@ -551,7 +551,7 @@ def normalize_waf(
             "log_event_id": log_event_id
         },
 
-        "detail": {
+        "details": {
             "request_parameters":
                 pick_waf_params(waf_detail),
 
