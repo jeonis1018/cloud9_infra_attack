@@ -1,6 +1,6 @@
+import ipaddress
 import json
 import os
-import ipaddress
 from datetime import datetime, timezone
 
 import boto3
@@ -34,7 +34,7 @@ def load_json_list_environment(name,default):
 
   return value
 
-PROTECTED_TRAILS = set(load_json_list_environment("PROTECT_TRAILS", ["Managed-role"]))
+PROTECTED_TRAILS = set(load_json_list_environment("PROTECTED_TRAILS", ["Managed-role"]))
 
 TEAM_CIDRS = []
 # TEAM_CIDRS에 정의된 JSON 배열(예: ["203.0.113.0/24", "198.51.100.50/32"])을 파이썬 문자열 리스트로 가져옴
