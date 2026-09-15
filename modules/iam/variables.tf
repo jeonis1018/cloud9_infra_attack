@@ -8,6 +8,17 @@ variable "s3_bucket_arn" {
   }
 }
 
+variable "profile_bucket_arn" {
+  description = "ARN of the profile-image S3 bucket the EC2 role may read/write. Null skips granting access."
+  type        = string
+  default     = null
+
+  validation {
+    condition     = var.profile_bucket_arn == null || can(regex("^arn:(aws|aws-us-gov|aws-cn):s3:::[^/]+$", var.profile_bucket_arn))
+    error_message = "profile_bucket_arn must be null or an S3 bucket ARN without an object suffix."
+  }
+}
+
 variable "enable_least_privilege" {
   description = "Use the reduced S3 read policy when true; use the intentionally broad, bucket-scoped lab policy when false."
   type        = bool

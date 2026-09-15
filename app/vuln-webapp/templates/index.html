@@ -1,15 +1,38 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="ko">
 <head>
-    <title>Cloud Nine and Three-Quarters Platform</title>
+    <title>프로필 사진 변경</title>
+    <style>
+        html, body { margin: 0; padding: 0; font-family: sans-serif; }
+        .header { padding: 10px; }
+        .profile-img { display: block; width: 150px; height: 150px; object-fit: cover; border-radius: 50%; background: #ccc; }
+        .nickname { font-weight: bold; margin-top: 8px; }
+        form { padding: 0 10px; margin-top: 10px; }
+        .error-box { color: red; white-space: pre-wrap; word-break: break-all; padding: 10px; margin: 10px; border: 1px solid red; }
+        .preview-img { display: block; max-width: 90vw; margin: 10px; }
+    </style>
 </head>
 <body>
-    <h2>TEAM: Cloud Nine and Three-Quarters Platform</h2>
-    <p>SSRF Vulnerability Test</p>
+    <div class="header">
+        <h2>TEAM: Cloud Nine and Three-Quarters Platform</h2>
+        {% if photo_url %}
+        <img class="profile-img" src="{{ photo_url }}" alt="profile">
+        {% else %}
+        <div class="profile-img"></div>
+        {% endif %}
+        <p class="nickname">{{ nickname }}</p>
+    </div>
 
-    <form action="/fetch" method="get">
-        <input type="text" name="url" size="50" placeholder="Enter URL to fetch" required>
-        <button type="submit">Fetch</button>
+    <form>
+        <input type="text" name="url" size="50" placeholder="이미지 URL을 입력하세요" value="{{ preview_url or '' }}" required>
+        <button type="submit" formaction="/preview" formmethod="get">미리보기</button>
+        <button type="submit" formaction="/change" formmethod="post">변경</button>
     </form>
+
+    {% if error %}
+    <div class="error-box">{{ error }}</div>
+    {% elif preview_image %}
+    <img class="preview-img" src="data:{{ preview_content_type }};base64,{{ preview_image }}" alt="preview">
+    {% endif %}
 </body>
 </html>

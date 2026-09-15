@@ -20,14 +20,10 @@ cat > /opt/app/templates/index.html << 'HTMLEOF'
 ${index_html}
 HTMLEOF
 
-cat > /opt/app/templates/result.html << 'HTMLEOF'
-${result_html}
-HTMLEOF
-
 # ==============================================
 # Python 패키지 설치
 # ==============================================
-pip3 install flask requests
+pip3 install flask requests boto3
 
 # ==============================================
 # systemd 서비스로 등록 (재부팅해도 자동 실행되게)
@@ -40,6 +36,7 @@ After=network.target
 [Service]
 Type=simple
 WorkingDirectory=/opt/app
+Environment=PROFILE_BUCKET_NAME=${profile_bucket_name}
 ExecStart=/usr/bin/python3 /opt/app/app.py
 Restart=always
 User=root
