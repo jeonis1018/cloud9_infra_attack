@@ -13,7 +13,7 @@ LOG_TYPE = "cloudtrail"
 RESULT_BUCKET = os.environ["RESULT_BUCKET"]
 NORMAL_PREFIX = os.environ.get("NORMAL_PREFIX","cloudtrail/normal").strip("/")
 REVIEW_PREFIX = os.environ.get("REVIEW_PREFIX","cloudtrail/review").strip("/")
-FINDING_PREFIX = os.environ.get("FINDING_PREFIX","cloudtrail/finding").strip("/")
+FINDING_PREFIX = os.environ.get("FINDING_PREFIX","cloudtrail/findings").strip("/")
 
 def load_json_list_environment(name,default):
   raw_value = os.environ.get(name)
@@ -304,9 +304,12 @@ def evaluate_cloudtrail_event(normalized_event):
     else:
       matched_conditions.append("SOURCE_IP_TEAM_STATUS_UNKNOWN")
 
-  # 점수 분기 
+  # 점수 분기
+  # 외부 IP 가산점이 반영된 risk_score로 분기해야 risk_score와 classification이
+  # 어긋나지 않는다. base_score로 분기하면 PutEventSelectors(70+10=80)가
+  # FINDING 임계값에 도달하고도 REVIEW로 남는다.
   classification = (
-    classification_from_score(matched_rule["base_score"]) if matched_rule else "NO_MATCH"
+    classification_from_score(risk_score) if matched_rule else "NO_MATCH"
   )
 
   return {
