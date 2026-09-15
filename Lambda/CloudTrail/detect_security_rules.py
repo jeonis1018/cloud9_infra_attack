@@ -405,6 +405,12 @@ S3_RULES = {
         "description": "보호 버킷에 요구한 공개 차단 설정이 제거되거나 false로 설정되었습니다. 실제 공개 상태를 확정하지는 않습니다.",
         "base_score": 90, "classification": "FINDING", "severity": "HIGH",
         "recommended_action": "버킷 및 계정의 공개 차단 상태와 변경 주체를 확인하고 승인된 기준 설정과 비교하세요.",
+        # 요청 내용이 불완전해 약화 여부를 판단할 수 없을 때 쓰는 REVIEW 표현.
+        "review_variant": {
+            "base_score": 70,
+            "title": "S3 공개 차단 설정 변경 - 요청 내용 확인 필요",
+            "description": "공개 차단 설정 변경 API는 성공했으나 요청 내용이 불완전하여 약화 여부를 판단할 수 없습니다.",
+        },
     },
     "AWS-S3-003": {
         "events": ["DeleteBucketPolicy"], "enabled": True,
@@ -542,6 +548,15 @@ def s3_rows(value):
     return [value] if isinstance(value, dict) else []
 
 
+def s3_delete_rows(request):
+    """DeleteObjects 요청의 삭제 대상 목록. CloudTrail은 objects/object를 섞어 씁니다."""
+    delete = s3_dict(s3_field(request, "delete"))
+    rows = s3_field(delete, "objects")
+    if rows is None:
+        rows = s3_field(delete, "object")
+    return s3_rows(rows)
+
+
 def s3_object_is_protected(bucket, key):
     if bucket in PROTECTED_BUCKETS:
         return True
@@ -566,11 +581,7 @@ def extract_s3_targets(normalized_event):
         key = s3_field(request, "key")
         if isinstance(key, str):
             objects.add((bucket, key))
-        delete = s3_dict(s3_field(request, "delete"))
-        rows = s3_field(delete, "objects")
-        if rows is None:
-            rows = s3_field(delete, "object")
-        for row in s3_rows(rows):
+        for row in s3_delete_rows(request):
             key = s3_field(row, "key")
             if isinstance(key, str):
                 objects.add((bucket, key))
@@ -594,6 +605,15 @@ def extract_s3_targets(normalized_event):
     return sorted(buckets), sorted(objects)
 
 
+def s3_source_ip_condition(team_status):
+    """팀 CIDR 판정 결과를 근거 문자열로 옮깁니다."""
+    if team_status is True:
+        return "SOURCE_IP_INSIDE_TEAM_CIDRS"
+    if team_status is False:
+        return "SOURCE_IP_OUTSIDE_TEAM_CIDRS"
+    return "SOURCE_IP_TEAM_STATUS_UNKNOWN"
+
+
 def s3_boolean(value):
     if isinstance(value, bool):
         return value
@@ -604,25 +624,21 @@ def s3_boolean(value):
 
 def make_s3_evaluation(rule, conditions, context, classification=None):
     result_class = classification or (rule["classification"] if rule else "NO_MATCH")
+    # REVIEW로 낮춰 보낼 때 룰이 별도 표현을 정의했으면 그 값으로 덮어씁니다.
+    view = rule or {}
+    if rule and classification == "REVIEW":
+        view = {**rule, **rule.get("review_variant", {})}
     return {
         "evaluation_schema_version": "1.0",
         "evaluated_at": utc_now(),
         "classification": result_class,
         # S3 룰은 합의한 기본 점수를 유지합니다. 외부 IP는 근거로만 기록합니다.
-        "risk_score": (70 if classification == "REVIEW" and rule["rule_id"] == "AWS-S3-002" else rule["base_score"]) if rule else 0,
+        "risk_score": view["base_score"] if rule else 0,
         "severity": rule["severity"] if rule else "INFORMATIONAL",
         "human_review_required": result_class in {"REVIEW", "FINDING"},
         "rule_id": rule["rule_id"] if rule else None,
-        "title": (
-            "S3 공개 차단 설정 변경 - 요청 내용 확인 필요"
-            if classification == "REVIEW" and rule and rule["rule_id"] == "AWS-S3-002"
-            else rule["title"] if rule else None
-        ),
-        "description": (
-            "공개 차단 설정 변경 API는 성공했으나 요청 내용이 불완전하여 약화 여부를 판단할 수 없습니다."
-            if classification == "REVIEW" and rule and rule["rule_id"] == "AWS-S3-002"
-            else rule["description"] if rule else None
-        ),
+        "title": view["title"] if rule else None,
+        "description": view["description"] if rule else None,
         "recommended_action": [rule["recommended_action"]] if rule else [],
         "matched_conditions": conditions,
         "context": context,
@@ -696,11 +712,7 @@ def evaluate_s3_event(normalized_event):
 
 
     conditions.extend(["S3_RULE_MATCHED", "API_CALL_SUCCESS", "PROTECTED_S3_TARGET"])
-    conditions.append(
-        "SOURCE_IP_INSIDE_TEAM_CIDRS" if team_status is True else
-        "SOURCE_IP_OUTSIDE_TEAM_CIDRS" if team_status is False else
-        "SOURCE_IP_TEAM_STATUS_UNKNOWN"
-    )
+    conditions.append(s3_source_ip_condition(team_status))
     details = s3_dict(normalized_event.get("details"))
     request = s3_dict(details.get("request_parameters"))
 
@@ -735,11 +747,7 @@ def evaluate_s3_event(normalized_event):
             "object_results_available": bool(deleted_rows or error_rows),
         }
         # 버전별 오류를 키 전체의 실패로 확장하지 않도록 (key, versionId)로 비교.
-        delete_request = s3_dict(s3_field(request, "delete"))
-        requested_rows = s3_field(delete_request, "objects")
-        if requested_rows is None:
-            requested_rows = s3_field(delete_request, "object")
-        requested_rows = s3_rows(requested_rows)
+        requested_rows = s3_delete_rows(request)
         failed = {(s3_field(row, "key"), s3_field(row, "versionId")) for row in error_rows}
         request_bucket = s3_field(request, "bucketName")
         protected_requests = [
