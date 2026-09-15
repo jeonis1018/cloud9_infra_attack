@@ -21,38 +21,18 @@ data "aws_iam_policy_document" "ec2_assume_role" {
   }
 }
 
+resource "aws_iam_role_policy_attachment" "readonly_before" {
+  count      = var.enable_least_privilege ? 0 : 1
+  role       = aws_iam_role.ec2.name
+  policy_arn = "arn:aws:iam::aws:policy/ReadOnlyAccess"
+}
+
 data "aws_iam_policy_document" "s3_access" {
-  dynamic "statement" {
-    for_each = var.enable_least_privilege ? [] : [1]
-
-    content {
-      sid       = "BroadTestBucketAccess"
-      effect    = "Allow"
-      actions   = ["s3:*"]
-      resources = [var.s3_bucket_arn, "${var.s3_bucket_arn}/*"]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = var.enable_least_privilege ? [1] : []
-
-    content {
-      sid       = "ListTestBucket"
-      effect    = "Allow"
-      actions   = ["s3:ListBucket"]
-      resources = [var.s3_bucket_arn]
-    }
-  }
-
-  dynamic "statement" {
-    for_each = var.enable_least_privilege ? [1] : []
-
-    content {
-      sid       = "ReadTestBucketObjects"
-      effect    = "Allow"
-      actions   = ["s3:GetObject"]
-      resources = ["${var.s3_bucket_arn}/*"]
-    }
+  statement {
+    sid       = "ProfileImageBasicAccess"
+    effect    = "Allow"
+    actions   = ["s3:GetObject", "s3:PutObject", "s3:PutObjectTagging"]
+    resources = ["${var.profile_bucket_arn}/profile/current"]
   }
 }
 
@@ -84,7 +64,10 @@ resource "aws_iam_instance_profile" "ec2" {
   path = "/whs-project/"
   role = aws_iam_role.ec2.name
 
-  depends_on = [aws_iam_role_policy.s3_access]
+  depends_on = [
+    aws_iam_role_policy.s3_access,
+    aws_iam_role_policy_attachment.readonly_before,
+  ]
 
   tags = merge(var.tags, {
     Name = "${var.name_prefix}-ec2-profile"

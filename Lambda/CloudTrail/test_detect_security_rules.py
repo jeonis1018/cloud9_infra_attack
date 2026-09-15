@@ -255,9 +255,11 @@ class S3Tests(unittest.TestCase):
         self.assertIn("test-event/AWS-S3-001.json", detector.build_result_key(value, evaluate(value)))
 
     def test_cloudtrail_rules_and_resources_regression(self):
+        # 기본 픽스처 IP(198.51.100.20)는 TEAM_CIDRS 밖이라 +10점이 붙는다.
+        # PutEventSelectors는 70+10=80으로 FINDING 임계값에 도달한다.
         for action, classification in (
             ("StopLogging", "FINDING"), ("DeleteTrail", "FINDING"),
-            ("UpdateTrail", "REVIEW"), ("PutEventSelectors", "REVIEW"),
+            ("UpdateTrail", "REVIEW"), ("PutEventSelectors", "FINDING"),
             ("PutInsightSelectors", "REVIEW"),
         ):
             with self.subTest(action=action):
