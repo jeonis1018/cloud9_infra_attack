@@ -193,6 +193,8 @@ resource "aws_lambda_function" "normalizer" {
     }
   }
 
+  depends_on = [aws_iam_role_policy.normalizer]
+
   tags = merge(var.tags, {
     Name = var.function_name
   })
@@ -203,11 +205,12 @@ resource "aws_lambda_function" "normalizer" {
 # ==============================================
 
 resource "aws_lambda_permission" "allow_cwlogs" {
-  statement_id  = "AllowExecutionFromCWLogs"
-  action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.normalizer.function_name
-  principal     = "logs.amazonaws.com"
-  source_arn    = "${local.finding_log_group_arn}:*"
+  statement_id   = "AllowExecutionFromCWLogs"
+  action         = "lambda:InvokeFunction"
+  function_name  = aws_lambda_function.normalizer.function_name
+  principal      = "logs.amazonaws.com"
+  source_arn     = "${local.finding_log_group_arn}:*"
+  source_account = data.aws_caller_identity.current.account_id
 }
 
 resource "aws_cloudwatch_log_subscription_filter" "normalizer" {
