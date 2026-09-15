@@ -1,13 +1,116 @@
-"""GuardDuty rules extracted from origin/main; CloudTrail/S3 rules remain unchanged."""
+"""GuardDuty Finding 및 GuardDuty 설정 변경 이벤트 전용 탐지 Lambda."""
+import ipaddress
 import json
 import os
 from datetime import datetime, timezone
-from cloudtrail_s3_rules import (s3, utc_now, source_ip_team_status,
-    classification_from_score, extract_trail_names, PROTECTED_TRAILS)
+
+import boto3
+
+s3 = boto3.client("s3")
+
+SCHEMA_VERSION = "2.0"
+GUARDDUTY_LOG_TYPE = "guardduty"
+CLOUDTRAIL_LOG_TYPE = "cloudtrail"
+
 RESULT_BUCKET = os.environ["RESULT_BUCKET"]
 NORMAL_PREFIX = os.environ.get("GUARDDUTY_NORMAL_PREFIX", "guardduty/normal").strip("/")
 REVIEW_PREFIX = os.environ.get("GUARDDUTY_REVIEW_PREFIX", "guardduty/review").strip("/")
 FINDING_PREFIX = os.environ.get("GUARDDUTY_FINDING_PREFIX", "guardduty/findings").strip("/")
+
+
+def load_json_list_environment(name, default):
+  raw_value = os.environ.get(name)
+  if raw_value is None or not raw_value.strip():
+    return default
+  try:
+    value = json.loads(raw_value)
+  except json.JSONDecodeError as error:
+    raise ValueError(f"Environment variable {name} must be a JSON array") from error
+  if not isinstance(value, list):
+    raise ValueError(f"Environment variable {name} must be a JSON array")
+  return value
+
+
+TEAM_CIDRS = []
+for cidr_value in load_json_list_environment("TEAM_CIDRS", []):
+  try:
+    TEAM_CIDRS.append(ipaddress.ip_network(str(cidr_value), strict=False))
+  except ValueError as error:
+    raise ValueError(f"Invalid CIDR in TEAM_CIDRS: {cidr_value}") from error
+
+
+def utc_now():
+  return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
+
+
+def source_ip_team_status(source_ip):
+  if not TEAM_CIDRS or not source_ip:
+    return None
+  try:
+    source_address = ipaddress.ip_address(source_ip)
+  except ValueError:
+    return None
+  return any(
+    source_address.version == team_network.version
+    and source_address in team_network
+    for team_network in TEAM_CIDRS
+  )
+
+
+def classification_from_score(risk_score):
+  if risk_score >= 80:
+    return "FINDING"
+  if risk_score >= 30:
+    return "REVIEW"
+  return "NO_MATCH"
+
+
+def extract_normalized_event(lambda_event):
+  if not isinstance(lambda_event, dict):
+    raise ValueError("Lambda input must be a JSON object")
+  normalized_event = lambda_event.get("normalized_event", lambda_event)
+  if not isinstance(normalized_event, dict):
+    raise ValueError("normalized_event must be a JSON object")
+  return normalized_event
+
+
+def validate_normalized_event(normalized_event):
+  if normalized_event.get("schema_version") != SCHEMA_VERSION:
+    raise ValueError("Unsupported or missing schema_version")
+  event_data = normalized_event.get("event")
+  if not isinstance(event_data, dict):
+    raise ValueError("event must be a JSON object")
+  if not isinstance(normalized_event.get("cloud"), dict):
+    raise ValueError("cloud must be a JSON object")
+  if not isinstance(normalized_event.get("outcome"), dict):
+    raise ValueError("outcome must be a JSON object")
+  for field_name in ("id", "service", "action"):
+    if not event_data.get(field_name):
+      raise ValueError(f"Missing required field: event.{field_name}")
+
+  log_type = normalized_event.get("log_type")
+  service = event_data["service"]
+  if log_type == GUARDDUTY_LOG_TYPE and service == "guardduty.amazonaws.com":
+    return
+  if log_type == CLOUDTRAIL_LOG_TYPE and service == "guardduty.amazonaws.com":
+    return
+  raise ValueError("Unsupported GuardDuty input")
+
+
+def extract_trail_names(normalized_event):
+  """공통 출력 형식을 유지하기 위한 보조 함수; GuardDuty 이벤트에서는 보통 빈 목록이다."""
+  trail_names = set()
+  for resource in normalized_event.get("resources") or []:
+    if not isinstance(resource, dict) or resource.get("type") != "AWS::CloudTrail::Trail":
+      continue
+    for value in (resource.get("id"), resource.get("arn")):
+      if value:
+        trail_names.add(str(value).rsplit("/", 1)[-1])
+  return sorted(trail_names)
+
+
+PROTECTED_TRAILS = set()
+
 GUARDDUTY_TAMPERING_RULES = {
     "UpdateDetector": {
         "rule_id": "AWS-GDT-001",
@@ -326,8 +429,8 @@ def evaluate_guardduty_tampering(normalized_event):
     "rule_id": matched_rule["rule_id"] if matched_rule else None,
     "title": matched_rule["title"] if matched_rule else None,
     "description": matched_rule["description"] if matched_rule else None,
-    "recommended_action":(
-      matched_rule["recommended_action"] if matched_rule else None,
+    "recommended_action": (
+      [matched_rule["recommended_action"]] if matched_rule else []
     ),
     "matched_conditions": matched_conditions,
     "context":{
@@ -407,3 +510,28 @@ def save_evaluation_result(normalized_event, evaluation):
 
   return object_key
 
+
+def evaluate_security_event(normalized_event):
+  log_type = normalized_event["log_type"]
+  if log_type == GUARDDUTY_LOG_TYPE:
+    return evaluate_guardduty_event(normalized_event)
+  return evaluate_guardduty_tampering(normalized_event)
+
+
+def lambda_handler(event, context):
+  normalized_event = extract_normalized_event(event)
+  validate_normalized_event(normalized_event)
+  evaluation = evaluate_security_event(normalized_event)
+  saved_key = save_evaluation_result(normalized_event, evaluation)
+  result = {
+    "statusCode": 200,
+    "event_id": normalized_event["event"]["id"],
+    "classification": evaluation["classification"],
+    "risk_score": evaluation["risk_score"],
+    "severity": evaluation["severity"],
+    "rule_id": evaluation["rule_id"],
+    "saved_bucket": RESULT_BUCKET,
+    "saved_key": saved_key,
+  }
+  print(json.dumps(result, ensure_ascii=False))
+  return result

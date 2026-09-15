@@ -15,10 +15,10 @@ from botocore.config import Config
 # 3. 보안 이벤트 이름에 해당하는 이벤트만 선별
 # 4. eventID 기준으로 이번 실행 내 중복 제거
 # 5. CloudTrailEvent JSON 문자열을 원본 레코드로 변환
-# 6. normalize-cloudtrail-logs-v2 Lambda에 비동기 전달
+# 6. normalize-cloudtrail-logs Lambda에 비동기 전달
 
 # 이 Lambda는 S3에 직접 저장하지 않는다.
-# 정규화와 저장은 normalize-cloudtrail-logs-v2가 담당한다.
+# 정규화와 저장은 normalize-cloudtrail-logs가 담당한다.
 # ============================================================
 
 cloudtrail = boto3.client(
