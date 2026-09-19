@@ -1,9 +1,12 @@
-# Terraform provider 잠금: 공식 6.60.0 공개 checksum 목록과 로컬 Windows h1을 사용합니다.
+# Terraform provider 잠금: 공식 6.60.0 공개 checksum 목록과 주요 플랫폼 h1을 사용합니다.
 provider "registry.terraform.io/hashicorp/aws" { # 공개 provider 배포물을 고정합니다.
   version = "6.60.0" # 로컬 schema 검증에 사용한 버전입니다.
   constraints = "~> 6.0" # 설정의 버전 제약과 같습니다.
   hashes = [ # 플랫폼별 배포 ZIP의 공식 SHA-256을 포함합니다.
-    "h1:aKdhZmlQi4A+18NUfL41TdCSDL94nB5hrpHUSx/bh7w=", # 로컬 Windows 패키지 내용 해시입니다.
+    "h1:BDSQlnJzI6J7VA7JmDk1gfgwVlEBWhTSVljOsxmEpOo=", # Linux 패키지 내용 해시입니다.
+    "h1:JV0ioBmGtA0OiDun9I4C5lEF5cs5xZ8DTJEjztzrHmM=", # macOS(amd64) 패키지 내용 해시입니다.
+    "h1:VF6oe4urgR2lRZuCAytMHvUZHtqcZU99TGw915LdCL0=", # macOS(arm64) 패키지 내용 해시입니다.
+    "h1:aKdhZmlQi4A+18NUfL41TdCSDL94nB5hrpHUSx/bh7w=", # Windows 패키지 내용 해시입니다.
     "zh:268d711a0a9c18459e09a837405244e5d459bb4ebb5d34a91c4fcbabe3e25d26", # HashiCorp HTTPS 공개 checksum입니다.
     "zh:5210c99d5946dd4985a6cff7460422e257037679b35df0a54982e3f675d1a8d5", # HashiCorp HTTPS 공개 checksum입니다.
     "zh:e087e5e6e3130980838552022e022a62a52a851cf93a0029cb5d410a34f6106b", # HashiCorp HTTPS 공개 checksum입니다.
