@@ -1,0 +1,21 @@
+cluster.name: whs-elk-elasticsearch-cluster # 공통 이름 규칙으로 검색 클러스터를 구분합니다.
+node.name: whs-elk-elasticsearch-node # 단일 Elasticsearch 노드의 역할을 표시합니다.
+node.roles: [master, data, ingest] # 소규모 검증용으로 선출·저장·ingest 역할을 겸합니다.
+path.data: /var/lib/elasticsearch # Terraform이 준비한 영구 EBS 저장 경로입니다.
+path.logs: /var/log/elasticsearch # 시스템 로그의 저장 경로입니다.
+network.host: 0.0.0.0 # private 인터페이스와 localhost에서 접속받으며 SG가 접근을 제한합니다.
+http.port: 9200 # Logstash와 Kibana가 접근할 HTTPS 포트입니다.
+transport.host: 127.0.0.1 # 단일 노드 검증에서는 노드 간 포트를 외부에 열지 않습니다.
+discovery.type: single-node # 다른 노드 검색 없이 하나의 노드로 클러스터를 시작합니다.
+xpack.security.enabled: true # 인증과 권한 검사를 사용합니다.
+xpack.security.autoconfiguration.enabled: false # 가이드의 수동 인증서 설정을 사용합니다.
+xpack.security.http.ssl.enabled: true # Elasticsearch REST API의 TLS를 강제합니다.
+xpack.security.http.ssl.key: certs/elasticsearch.key # 이 서버만 가지는 private key입니다.
+xpack.security.http.ssl.certificate: certs/elasticsearch.crt # IP와 localhost SAN이 포함된 서버 인증서입니다.
+xpack.security.http.ssl.certificate_authorities: [certs/ca.crt] # 내부 CA 체인을 지정합니다.
+xpack.security.transport.ssl.enabled: true # 단일 노드에서도 전송 계층 TLS 설정을 명시합니다.
+xpack.security.transport.ssl.key: certs/elasticsearch.key # 전송 계층에서도 이 서버의 키를 사용합니다.
+xpack.security.transport.ssl.certificate: certs/elasticsearch.crt # serverAuth와 clientAuth 용도의 인증서입니다.
+xpack.security.transport.ssl.certificate_authorities: [certs/ca.crt] # 같은 CA에서 발급된 노드 인증서만 신뢰합니다.
+xpack.security.transport.ssl.verification_mode: full # 인증서 체인과 접속 주소를 검증합니다.
+s3.client.default.region: __AWS_REGION__ # IMDSv2의 인스턴스 역할로 이 리전의 S3 스냅샷을 사용합니다.

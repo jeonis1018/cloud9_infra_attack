@@ -1,0 +1,14 @@
+node.name: whs-elk-logstash-collector # 공통 이름 규칙으로 수집 노드를 구분합니다.
+path.data: /var/lib/logstash # persistent queue와 내부 상태를 저장할 EBS 경로입니다.
+path.logs: /var/log/logstash # Logstash 운영 로그 경로입니다.
+pipeline.workers: 2 # 작은 검증 인스턴스의 동시 처리 작업자를 제한합니다.
+pipeline.batch.size: 125 # 기본 수준의 배치 크기로 메모리 사용을 제한합니다.
+pipeline.ecs_compatibility: v8 # Elastic Common Schema v8 필드 구조를 사용합니다.
+queue.type: persisted # 메모리만 사용하지 않고 디스크 큐에 이벤트를 보관합니다.
+queue.max_bytes: 2gb # 노드 용량 검증용 초기 큐 크기이며 측정 후 조정합니다.
+queue.checkpoint.writes: 1 # 각 기록마다 checkpoint를 만들어 강제 종료 시 손실 창을 줄입니다.
+dead_letter_queue.enable: true # Elasticsearch의 문서별 매핑 오류 등을 DLQ에 보관합니다.
+dead_letter_queue.max_bytes: 1gb # 오류 큐가 디스크를 무한히 소비하지 않게 제한합니다.
+api.http.host: 127.0.0.1 # Logstash 관리 API를 로컬에서만 노출합니다.
+api.http.port: 9600 # 로컬 수집량·큐 상태를 조회할 포트입니다.
+config.reload.automatic: false # 파일 변경만으로 파이프라인이 즉시 바뀌지 않게 합니다.

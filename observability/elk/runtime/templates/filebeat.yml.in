@@ -1,0 +1,63 @@
+name: whs-elk-filebeat-collector # 공통 이름 규칙으로 Filebeat 수집기를 구분합니다.
+filebeat.inputs: # 서비스별 큐를 독립적으로 읽습니다.
+  - type: aws-s3 # 공식 S3·SQS 입력을 사용합니다.
+    id: whs-elk-filebeat-cloudtrail # 재시작 후에도 유지할 CloudTrail 입력 ID입니다.
+    enabled: true # 큐에 객체 알림이 들어오면 처리합니다.
+    queue_url: "__CLOUDTRAIL_QUEUE_URL__" # CloudTrail 데이터 파일 알림만 받는 큐입니다.
+    region: "__AWS_REGION__" # AWS SDK 리전입니다.
+    expand_event_list_from_field: Records # CloudTrail Records 배열을 개별 이벤트로 나눕니다.
+    content_type: application/json # CloudTrail은 JSON 문서로 처리합니다.
+    number_of_workers: 2 # S3 파일을 동시에 처리할 작업자 수입니다.
+    visibility_timeout: 300s # 처리 중인 SQS 메시지를 숨기는 시간이며 입력이 연장합니다.
+    sqs.max_receive_count: -1 # 실패 메시지를 Filebeat가 삭제하지 않고 SQS DLQ 정책에 맡깁니다.
+    fields: # 입력 소스 구분용 사용자 정의 필드입니다.
+      source_kind: cloudtrail # Logstash에서 CloudTrail 정규화를 선택합니다.
+      collection_region: "__AWS_REGION__" # 원문에 없는 리전은 수집 리전으로 보완합니다.
+  - type: aws-s3 # 서버 로그의 S3 객체를 읽습니다.
+    id: whs-elk-filebeat-cloudwatch # 공통 이름 규칙을 사용하는 CloudWatch 입력 ID입니다.
+    enabled: true # 서버 로그 입력을 켭니다.
+    queue_url: "__CLOUDWATCH_QUEUE_URL__" # CloudWatch 전용 큐입니다.
+    region: "__AWS_REGION__" # AWS SDK 리전입니다.
+    content_type: text/plain # Firehose가 구분한 JSONL envelope를 한 줄씩 읽습니다.
+    max_bytes: 16777216 # envelope 한 줄은 16MiB까지 읽고 실제 최대 크기를 검증합니다.
+    number_of_workers: 2 # 동시 S3 처리 수를 제한합니다.
+    visibility_timeout: 300s # 처리 중 알림을 임시 숨깁니다.
+    sqs.max_receive_count: -1 # SQS redrive 정책이 실패 큐로 이동시키게 합니다.
+    fields: # 입력 구분 필드를 지정합니다.
+      source_kind: cloudwatch # CloudWatch envelope 처리를 선택합니다.
+      collection_region: "__AWS_REGION__" # 이 구성은 한 리전 수집이므로 수집 리전을 명시합니다.
+  - type: aws-s3 # WAF가 도착한 S3 객체를 읽습니다.
+    id: whs-elk-filebeat-waf # 공통 이름 규칙을 사용하는 WAF 입력 ID입니다.
+    enabled: true # WAF 입력을 켭니다.
+    queue_url: "__WAF_QUEUE_URL__" # WAF 전용 큐입니다.
+    region: "__AWS_REGION__" # AWS SDK 리전입니다.
+    content_type: text/plain # CloudWatch에서 전달된 WAF envelope JSONL입니다.
+    max_bytes: 16777216 # 한 envelope의 크기 제한입니다.
+    number_of_workers: 2 # 검증 단계의 동시 처리 수입니다.
+    visibility_timeout: 300s # 처리 중인 메시지를 숨깁니다.
+    sqs.max_receive_count: -1 # Filebeat의 자동 폐기 기능을 끕니다.
+    fields: # 서비스 구분 필드를 지정합니다.
+      source_kind: waf # WAF 요청 JSON을 추가로 파싱합니다.
+      collection_region: "__AWS_REGION__" # 원문에 없는 경우의 수집 리전입니다.
+  - type: aws-s3 # GuardDuty 탐지 결과 객체를 읽습니다.
+    id: whs-elk-filebeat-guardduty # 공통 이름 규칙을 사용하는 GuardDuty 입력 ID입니다.
+    enabled: true # 결과가 존재할 때 수집합니다.
+    queue_url: "__GUARDDUTY_QUEUE_URL__" # GuardDuty 전용 큐입니다.
+    region: "__AWS_REGION__" # AWS SDK 리전입니다.
+    content_type: text/plain # 한 줄에 Finding 하나가 있는 JSONL을 읽습니다.
+    max_bytes: 16777216 # 단일 Finding의 읽기 상한입니다.
+    number_of_workers: 2 # 동시에 처리하는 S3 객체 수입니다.
+    visibility_timeout: 300s # 처리 중인 알림을 숨깁니다.
+    sqs.max_receive_count: -1 # 알림 삭제 대신 SQS DLQ 정책을 사용합니다.
+    fields: # 서비스 식별 필드입니다.
+      source_kind: guardduty # GuardDuty 정규화를 선택합니다.
+      collection_region: "__AWS_REGION__" # 원문 리전이 있으면 그것을 우선 사용합니다.
+queue.disk: # Filebeat의 전송 대기 이벤트를 디스크에 저장합니다.
+  max_size: 2GB # 작은 검증 환경의 초기 큐 크기입니다.
+output.logstash: # Elasticsearch에 직접 쓰지 않고 로컬 Logstash로 전달합니다.
+  hosts: ["127.0.0.1:5044"] # EC2 내부 루프백 통신입니다.
+  worker: 1 # 초기 전송 작업자 수입니다.
+logging.level: info # 평상시에는 원문을 debug 로그에 출력하지 않습니다.
+http.enabled: true # 로컬 상태 점검 API를 켭니다.
+http.host: 127.0.0.1 # 외부에서 Filebeat 상태 API에 접근하지 못하게 합니다.
+http.port: 5066 # 로컬 상태 API 포트입니다.

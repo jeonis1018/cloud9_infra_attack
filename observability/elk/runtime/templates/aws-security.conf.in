@@ -1,0 +1,26 @@
+input { # 수집 서버 내부의 Beats 이벤트를 받습니다.
+  beats { # Filebeat의 ACK가 있는 전송 프로토콜을 사용합니다.
+    host => "127.0.0.1" # 같은 서버에서만 접근하므로 5044를 SG에 열지 않습니다.
+    port => 5044 # Filebeat가 연결하는 로컬 포트입니다.
+  } # Beats 입력 설정을 마칩니다.
+} # 입력을 마칩니다.
+filter { # 원본을 보존하며 공통 필드를 만듭니다.
+  ruby { # 여러 서비스의 배열과 시간 형식을 하나의 검증된 함수로 처리합니다.
+    path => "/etc/logstash/normalize.rb" # 매 줄 주석과 내장 테스트가 있는 정규화 코드입니다.
+  } # Ruby 필터 설정을 마칩니다.
+} # 필터를 마칩니다.
+output { # 정상·격리 이벤트 모두 검색 가능한 별도 인덱스로 전송합니다.
+  elasticsearch { # 문서별 색인 결과와 재시도를 처리하는 공식 출력 플러그인입니다.
+    hosts => ["https://__ES_PRIVATE_IP__:9200"] # Elasticsearch private IP의 TLS endpoint입니다.
+    api_key => "${ES_API_KEY}" # 30-admin.py가 넣은 Logstash keystore 값이며 envsubst하지 않습니다.
+    ssl_enabled => true # Elasticsearch 연결의 TLS를 켭니다.
+    ssl_certificate_authorities => ["/etc/logstash/certs/ca.crt"] # 내부 CA로 인증서를 검증합니다.
+    ssl_verification_mode => "full" # IP SAN까지 검증합니다.
+    index => "%{[@metadata][target_index]}" # 소스와 이벤트 날짜로 결정한 일별 인덱스입니다.
+    document_id => "%{[@metadata][document_id]}" # 같은 객체 이벤트 재전송의 중복을 덮어씁니다.
+    action => "index" # 동일한 ID를 다시 받으면 기존 문서를 갱신합니다.
+    data_stream => false # 작은 검증 환경에서 일별 일반 인덱스를 명시적으로 사용합니다.
+    ilm_enabled => false # 출력 플러그인의 rollover를 끄고 사전 등록한 삭제 전용 ILM을 사용합니다.
+    manage_template => false # 관리자만 사전 정의한 매핑과 템플릿을 바꿀 수 있습니다.
+  } # Elasticsearch 출력을 마칩니다.
+} # 출력 설정을 마칩니다.
