@@ -71,7 +71,8 @@ resource "aws_lb_listener" "https" {
 
 # IMDS 우회 표기 정규식 (SSRF Query/Body 규칙 공용)
 locals {
-  imds_regex = "169\\.0*254\\.0*169\\.0*254|::ffff:169\\.254\\.169\\.254|::ffff:a9fe:a9fe|fd00:0*ec2:(0*:)*0*254|2852039166|0xa9fea9fe|0xa9\\.0xfe\\.0xa9\\.0xfe|0251\\.0376\\.0251\\.0376|169\\.254\\.43518|169\\.16689662|/latest/meta-data|/latest/user-data|/latest/dynamic|/latest/api/token|identity-credentials/ec2/security-credentials"
+  cloudwatch_agent_response_priority_offset = var.cloudwatch_agent_response_ip_sets == null ? 0 : 1
+  imds_regex                                = "169\\.0*254\\.0*169\\.0*254|::ffff:169\\.254\\.169\\.254|::ffff:a9fe:a9fe|fd00:0*ec2:(0*:)*0*254|2852039166|0xa9fea9fe|0xa9\\.0xfe\\.0xa9\\.0xfe|0251\\.0376\\.0251\\.0376|169\\.254\\.43518|169\\.16689662|/latest/meta-data|/latest/user-data|/latest/dynamic|/latest/api/token|identity-credentials/ec2/security-credentials"
 }
 
 # WAF Web ACL
@@ -90,9 +91,44 @@ resource "aws_wafv2_web_acl" "this" {
     sampled_requests_enabled   = true
   }
 
+  # 이 Web ACL 모듈이 자동 차단 규칙도 소유해 후속 apply에서 규칙이 사라지지 않게 합니다.
+  dynamic "rule" {
+    for_each = var.cloudwatch_agent_response_ip_sets == null ? [] : [var.cloudwatch_agent_response_ip_sets]
+    content {
+      name     = "respond-cloudwatch-agent-logs-block"
+      priority = 0
+
+      action {
+        block {}
+      }
+
+      statement {
+        or_statement {
+          statement {
+            ip_set_reference_statement {
+              arn = rule.value.ipv4_arn
+            }
+          }
+          statement {
+            ip_set_reference_statement {
+              arn = rule.value.ipv6_arn
+            }
+          }
+        }
+      }
+
+      visibility_config {
+        cloudwatch_metrics_enabled = true
+        metric_name                = "respond-cloudwatch-agent-logs-block"
+        sampled_requests_enabled   = true
+      }
+    }
+  }
+
+
   rule {
     name     = "AWSManagedCommonRuleSet"
-    priority = 4
+    priority = 4 + local.cloudwatch_agent_response_priority_offset
 
     override_action {
       count {}
@@ -114,7 +150,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "AWSManagedKnownBadInputs"
-    priority = 5
+    priority = 5 + local.cloudwatch_agent_response_priority_offset
 
     override_action {
       count {}
@@ -136,7 +172,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "AWSManagedSQLiRuleSet"
-    priority = 6
+    priority = 6 + local.cloudwatch_agent_response_priority_offset
 
     override_action {
       count {}
@@ -158,7 +194,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "GeoBlockNonKR"
-    priority = 0 # 기존 규칙(1, 2번)과 안 겹치게
+    priority = 0 + local.cloudwatch_agent_response_priority_offset # 기존 규칙(1, 2번)과 안 겹치게
 
     action {
       block {}
@@ -187,7 +223,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "Custom-IMDS-SSRF-QueryArguments"
-    priority = 1
+    priority = 1 + local.cloudwatch_agent_response_priority_offset
 
     statement {
       regex_match_statement {
@@ -227,7 +263,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "Custom-IMDS-SSRF-Body"
-    priority = 2
+    priority = 2 + local.cloudwatch_agent_response_priority_offset
 
     statement {
       regex_match_statement {
@@ -269,7 +305,7 @@ resource "aws_wafv2_web_acl" "this" {
 
   rule {
     name     = "RateLimit-PerIP"
-    priority = 3
+    priority = 3 + local.cloudwatch_agent_response_priority_offset
 
     statement {
       rate_based_statement {
