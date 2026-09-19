@@ -1,0 +1,5 @@
+bucket       = "REPLACE-EXISTING-TERRAFORM-STATE-BUCKET" # 원본·스냅샷·아티팩트와 분리된 기존 상태 버킷입니다.
+key          = "whs-elk/terraform.tfstate" # 다른 스택과 겹치지 않는 상태 경로입니다.
+region       = "ap-northeast-2" # 상태 버킷의 실제 리전입니다.
+encrypt      = true # 상태 저장 암호화 정책과 함께 사용합니다.
+use_lockfile = true # Terraform 1.10 이상 S3 잠금 파일을 사용합니다.
