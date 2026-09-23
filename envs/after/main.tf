@@ -50,6 +50,8 @@ module "vpc" {
 module "alb_waf" {
   source = "../../modules/alb-waf"
 
+  cloudwatch_agent_response_ip_sets = var.enable_cloudwatch_agent_response ? module.cloudwatch_agent[0].response_ip_sets : null
+
   vpc_id            = module.vpc.vpc_id
   vpc_name          = "WHS_VPC"
   public_subnet_ids = module.vpc.public_subnet_ids

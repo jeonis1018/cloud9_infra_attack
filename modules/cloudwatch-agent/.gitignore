@@ -1,0 +1,9 @@
+# Local Terraform/build output; source and tests belong in Git.
+.terraform/
+.terraform.lock.hcl
+runtime.zip
+*.tfstate
+*.tfstate.*
+*.tfplan
+__pycache__/
+*.pyc
