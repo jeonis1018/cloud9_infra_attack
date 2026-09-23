@@ -1,0 +1,26 @@
+# 실제 배포 입력과 상태는 공유하지 않는다.
+terraform/.terraform/
+terraform/terraform.tfvars
+terraform/backend.hcl
+terraform/*.auto.tfvars
+terraform/*.tfstate*
+terraform/*.tfplan
+terraform/*.plan
+terraform/tfplan
+terraform/crash.log
+# 설치 중 생성되는 인증서·자격증명·비공개 작업물을 제외한다.
+.run/
+.private/
+runtime/.private/
+runtime/*.env
+*.key
+*.p12
+*.keystore
+*.pem
+*.tar.gz
+__pycache__/
+replay-message*.json
+cloudwatch-agent-elk*.json
+runtime-config.zip
+# 배포 패키지 생성 목록은 저장소 코드와 분리한다.
+CONTENTS.sha256

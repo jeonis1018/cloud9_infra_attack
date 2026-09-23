@@ -1,0 +1,37 @@
+aws_region          = "ap-northeast-2" # 서울 리전 단일 계정 검증 예제입니다.
+expected_account_id = "123456789012" # aws sts get-caller-identity 결과의 실제 계정 ID로 바꿉니다.
+name_prefix         = "whs-elk" # 모든 신규 자원의 접두사를 whs-elk로 고정합니다.
+vpc_id              = "vpc-REPLACE" # 사전에 확인한 기존 VPC ID입니다.
+private_subnet_ids = { # 공인 IP 자동 할당이 꺼지고 NAT 경로가 있는 subnet을 지정합니다.
+  collector     = "subnet-REPLACE" # 수집 서버 subnet입니다.
+  elasticsearch = "subnet-REPLACE" # ES 서버 subnet입니다.
+  kibana        = "subnet-REPLACE" # 조회 서버 subnet입니다.
+} # 역할별 subnet을 끝냅니다.
+instance_types = { # 시작 사양이며 실제 로그량을 측정해 조정합니다.
+  collector     = "t3.large" # 2 vCPU·8 GiB, CPU credit를 감시합니다.
+  elasticsearch = "t3.large" # 2 vCPU·8 GiB, 지속 부하는 M 계열을 검토합니다.
+  kibana        = "t3.medium" # 2 vCPU·4 GiB입니다.
+} # 사양을 끝냅니다.
+root_volume_gib = { # root EBS를 종료 후에도 보존합니다.
+  collector     = 50 # PQ와 Filebeat 상태 공간입니다.
+  elasticsearch = 100 # 인덱스 공간입니다.
+  kibana        = 30 # OS·조회 서비스 공간입니다.
+} # 디스크 사양을 끝냅니다.
+ami_id = null # 첫 plan 결과의 selected_ami_id를 확인하고 고정할 수 있습니다.
+raw_retention_days = 30 # 현재 버전 30일 + 비현재 버전 7일 정책입니다.
+existing_log_group_names = { # 기존 그룹을 재사용하면 정확한 이름을 넣습니다.
+  cloudwatch = null # null이면 whs-elk-cloudwatch-workload를 새로 만듭니다.
+  waf        = null # null이면 aws-waf-logs-whs-elk-cloudwatch-waf를 새로 만듭니다.
+} # 그룹 선택을 끝냅니다.
+create_cloudtrail = false # 기존 조직/계정 Trail이 없는지 확인한 후에만 true로 바꿉니다.
+existing_cloudtrail_bucket_name = null # 기존 Trail 원본을 읽으려면 같은 계정·리전 버킷 이름을 입력합니다.
+existing_cloudtrail_object_prefix = null # 예: AWSLogs/123456789012/CloudTrail/; 조직 Trail은 실제 경로를 확인합니다.
+existing_cloudtrail_kms_key_arns = [] # 기존 로그 CMK ARN 목록이며 기존 키 정책 허용도 필요합니다.
+create_guardduty_detector = false # 기존 detector가 없을 때만 true로 바꿉니다.
+guardduty_detector_id = "" # 기존 detector ID를 넣고 신규 생성은 false로 둡니다.
+enable_guardduty_export = false # 기존 S3 내보내기 소유권을 확인한 뒤 true로 바꿉니다.
+waf_web_acl_arn = "" # 기존 same-region web ACL ARN입니다.
+manage_waf_logging = false # 다른 Terraform이 로깅을 소유하면 false로 두고 그 소유 스택에서 연결합니다.
+create_s3_gateway_endpoint = false # 이미 endpoint가 있으면 생성하지 않습니다.
+private_route_table_ids = [] # 새 S3 gateway endpoint를 만들 때만 기존 private route table ID를 입력합니다.
+enable_alerting = false # true면 SNS·EventBridge·CloudWatch alarm만 만들며 구독은 수동입니다.

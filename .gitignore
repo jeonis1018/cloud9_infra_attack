@@ -13,6 +13,7 @@ override.tf.json
 .terraformrc
 terraform.rc
 .terraform.lock.hcl
+!/observability/elk/terraform/.terraform.lock.hcl
 
 # 자격증명 관련
 *.pem

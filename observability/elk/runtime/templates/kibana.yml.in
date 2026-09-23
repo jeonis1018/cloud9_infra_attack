@@ -1,0 +1,13 @@
+server.name: whs-elk-kibana-dashboard # 공통 이름 규칙으로 조회 서버의 역할을 표시합니다.
+server.host: 0.0.0.0 # private IP와 SSM localhost 전달을 허용합니다.
+server.port: 5601 # 브라우저가 접속할 HTTPS 포트입니다.
+server.ssl.enabled: true # 브라우저와 Kibana 사이의 TLS를 켭니다.
+server.ssl.certificate: /etc/kibana/certs/kibana.crt # localhost와 private IP SAN 인증서입니다.
+server.ssl.key: /etc/kibana/certs/kibana.key # Kibana 서버의 private key입니다.
+elasticsearch.hosts: ["https://__ES_PRIVATE_IP__:9200"] # Elasticsearch의 private IP로만 연결합니다.
+elasticsearch.ssl.certificateAuthorities: [/etc/kibana/certs/ca.crt] # Elasticsearch 인증서의 CA를 신뢰합니다.
+elasticsearch.ssl.verificationMode: full # TLS 체인과 IP SAN을 검증합니다.
+xpack.security.secureCookies: true # 인증 쿠키를 HTTPS 연결에서만 전달합니다.
+telemetry.enabled: false # 프로젝트에서 사용 통계 전송을 끕니다.
+logging.root.level: info # 비밀정보가 포함될 수 있는 debug 로그는 기본 사용하지 않습니다.
+# elasticsearch.serviceAccountToken과 세 가지 encryptionKey는 30-admin.py가 keystore에 넣습니다.
