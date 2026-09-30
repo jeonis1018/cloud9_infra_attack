@@ -1,0 +1,186 @@
+[09:53:22] INFO  ================================================================
+[09:53:22] INFO    SCENARIO 3 — OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 더미 랜섬
+[09:53:22] INFO    흐름도3 (WHS 실습) — 단일 인스턴스 대상
+[09:53:22] INFO  ================================================================
+[09:53:22] INFO  [auth] 정상 로그인 성공 — user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[09:53:22] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal
+[09:53:22] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[09:53:22] INFO  ================================================================
+[09:53:22] INFO    STEP 1 — OS 커맨드 인젝션(T1190): 호스트 셸 확보
+[09:53:22] INFO  ================================================================
+[09:53:23] INFO      sh id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[09:53:23] INFO      sh hostname   → ip-10-3-11-45.ap-northeast-2.compute.internal
+[09:53:24] INFO      sh uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[09:53:24] INFO      sh pwd        → /opt/WHS-Vuln-Web
+[09:53:24] INFO    [+] /bin/sh 컨텍스트에서 임의 명령 실행 확인 (ec2-user, 대상 ip-10-3-11-45.ap-northeast-2.compute.internal)
+[09:53:24] INFO  ================================================================
+[09:53:24] INFO    STEP 2 — 노출 SSH(T1133): private subnet — 연결 시도만
+[09:53:24] INFO  ================================================================
+[09:53:24] INFO    [+] 127.0.0.1:22 연결 시도 결과: SSH_OPEN
+[09:53:24] INFO        → 공인 IP 없어 실제 SSH 불가. VPC Flow Log 에 REJECT 증거만 남기는 흐름 유지
+[09:53:24] INFO  ================================================================
+[09:53:24] INFO    STEP 3 — 지속성(T1505.003): 쓰기 가능 위치에 마커
+[09:53:24] INFO  ================================================================
+[09:53:25] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal → ~/.bashrc ADDED
+[09:53:25] INFO    [=] 대상 1대에 마커 확인 — 재로그인 시 로딩되는 위치 시연
+[09:53:25] INFO        정리 절차 기록: recovery/persistence_marker.json
+[09:53:25] INFO  ================================================================
+[09:53:25] INFO    STEP 4 — T1486: 호스트 파일 변형 (시스템/앱 미접촉, 가역)
+[09:53:25] INFO  ================================================================
+[09:53:25] INFO  [payload] impact.sh (2791 bytes) 업로드
+[09:53:25] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/bdcc62b6-263f-41fa-8aeb-706ce5d1f0e6--impact.sh (executable=True)
+[09:53:25] INFO    [+] impact.sh 업로드 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/bdcc62b6-263f-41fa-8aeb-706ce5d1f0e6--impact.sh (run_id=d9c753410c5a)
+[09:53:25] INFO        대상=/opt/whs-lab-data — base64 가역, 원본 .bak 보존, restore.sh 동시 생성
+[09:53:25] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal — 변형 3개: app-config.json, orders.csv, session.log
+[09:53:25] INFO    [=] 대상 1대 처리 완료
+[09:53:25] INFO        복구: python scenario3.py --restore (또는 호스트에서 sh /opt/whs-lab-data/restore.sh)
+[09:53:25] INFO        복구 매니페스트: recovery/impact_manifest.json
+[09:53:25] INFO  ================================================================
+[09:53:25] INFO    SCENARIO 3 종료
+[09:53:25] INFO    로그: scenario3/scenario3.log
+[09:53:25] INFO  ================================================================
+[09:53:59] INFO  ================================================================
+[09:53:59] INFO    SCENARIO 3 — OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 더미 랜섬
+[09:53:59] INFO    흐름도3 (WHS 실습) — 단일 인스턴스 대상
+[09:53:59] INFO  ================================================================
+[09:54:00] INFO  [auth] 정상 로그인 성공 — user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[09:54:00] INFO  [pin] 복구 대상 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal (공격 당시 기록)
+[09:54:00] INFO  ================================================================
+[09:54:00] INFO    RESTORE — 더미 변형 원상복구
+[09:54:00] INFO  ================================================================
+[09:54:00] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal → RESTORED_VERIFIED app-config.json | RESTORED_VERIFIED orders.csv | RESTORED_VERIFIED session.log
+[09:54:00] INFO    [=] 대상 1대 복구 완료
+[09:54:00] INFO  ================================================================
+[09:54:00] INFO    SCENARIO 3 복구 종료
+[09:54:00] INFO    로그: scenario3/scenario3.log
+[09:54:00] INFO  ================================================================
+[10:24:05] INFO  ================================================================
+[10:24:05] INFO    SCENARIO 3 — OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 더미 랜섬
+[10:24:05] INFO    흐름도3 (WHS 실습) — 단일 인스턴스 대상
+[10:24:05] INFO  ================================================================
+[10:24:05] INFO  [auth] 정상 로그인 성공 — user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[10:24:05] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:24:05] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[10:24:05] INFO  ================================================================
+[10:24:05] INFO    STEP 1 — OS 커맨드 인젝션(T1190): 호스트 셸 확보
+[10:24:05] INFO  ================================================================
+[10:24:06] INFO      sh id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[10:24:06] INFO      sh hostname   → ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:24:06] INFO      sh uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[10:24:07] INFO      sh pwd        → /opt/WHS-Vuln-Web
+[10:24:07] INFO    [+] /bin/sh 컨텍스트에서 임의 명령 실행 확인 (ec2-user, 대상 ip-10-3-11-45.ap-northeast-2.compute.internal)
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO    STEP 2 — 노출 SSH(T1133): private subnet — 연결 시도만
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO    [+] 127.0.0.1:22 연결 시도 결과: SSH_OPEN
+[10:24:07] INFO        → 공인 IP 없어 실제 SSH 불가. VPC Flow Log 에 REJECT 증거만 남기는 흐름 유지
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO    STEP 3 — 지속성(T1505.003): 쓰기 가능 위치에 마커
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal → ~/.bashrc ADDED
+[10:24:07] INFO    [=] 대상 1대에 마커 확인 — 재로그인 시 로딩되는 위치 시연
+[10:24:07] INFO        정리 절차 기록: recovery/persistence_marker.json
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO    STEP 4 — T1486: 호스트 파일 변형 (시스템/앱 미접촉, 가역)
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO  [payload] impact.sh (2791 bytes) 업로드
+[10:24:07] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/8c30fbcd-cd47-4b49-a0dd-4fc65b651529--impact.sh (executable=True)
+[10:24:07] INFO    [+] impact.sh 업로드 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/8c30fbcd-cd47-4b49-a0dd-4fc65b651529--impact.sh (run_id=d17310fdaedc)
+[10:24:07] INFO        대상=/opt/whs-lab-data — base64 가역, 원본 .bak 보존, restore.sh 동시 생성
+[10:24:07] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal — 변형 3개: app-config.json, orders.csv, session.log
+[10:24:07] INFO    [=] 대상 1대 처리 완료
+[10:24:07] INFO        복구: python scenario3.py --restore (또는 호스트에서 sh /opt/whs-lab-data/restore.sh)
+[10:24:07] INFO        복구 매니페스트: recovery/impact_manifest.json
+[10:24:07] INFO  ================================================================
+[10:24:07] INFO    SCENARIO 3 종료
+[10:24:07] INFO    로그: scenario3/scenario3.log
+[10:24:07] INFO  ================================================================
+[10:24:24] INFO  ================================================================
+[10:24:24] INFO    SCENARIO 3 — OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 더미 랜섬
+[10:24:24] INFO    흐름도3 (WHS 실습) — 단일 인스턴스 대상
+[10:24:24] INFO  ================================================================
+[10:24:24] INFO  [auth] 정상 로그인 성공 — user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[10:24:24] INFO  [pin] 복구 대상 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal (impact_manifest.json 기록)
+[10:24:24] INFO  ================================================================
+[10:24:24] INFO    RESTORE — 호스트 흔적 원상복구
+[10:24:24] INFO  ================================================================
+[10:24:24] INFO    [+] 4단계 변형 복구 — RESTORED_VERIFIED app-config.json | RESTORED_VERIFIED orders.csv | RESTORED_VERIFIED session.log
+[10:24:25] INFO    [+] 잔여물 제거 — 남은 파일: app-config.json | orders.csv | session.log
+[10:24:25] INFO    [+] 3단계 마커 제거 — 남은 개수: 0
+[10:24:25] INFO    [=] ip-10-3-11-45.ap-northeast-2.compute.internal 원상복구 완료
+[10:24:25] INFO  ================================================================
+[10:24:25] INFO    SCENARIO 3 복구 종료
+[10:24:25] INFO    로그: scenario3/scenario3.log
+[10:24:25] INFO  ================================================================
+[10:29:46] INFO  ================================================================
+[10:29:46] INFO    SCENARIO 3 — OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 더미 랜섬
+[10:29:46] INFO    흐름도3 (WHS 실습) — 단일 인스턴스 대상
+[10:29:46] INFO  ================================================================
+[10:29:46] INFO  [auth] 정상 로그인 성공 — user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[10:29:46] INFO  [pin] 대상 인스턴스 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:29:46] INFO        이후 모든 단계는 이 1대에서만 실행된다(다른 인스턴스 미접촉).
+[10:29:46] INFO  ================================================================
+[10:29:46] INFO    STEP 1 — OS 커맨드 인젝션(T1190): 호스트 셸 확보
+[10:29:46] INFO  ================================================================
+[10:29:47] INFO      sh id         → uid=1000(ec2-user) gid=1000(ec2-user) groups=1000(ec2-user),4(adm),10(wheel),190(systemd-journal) context=system_u:system_r:unconfined_service_t:s0
+[10:29:47] INFO      sh hostname   → ip-10-3-11-45.ap-northeast-2.compute.internal
+[10:29:47] INFO      sh uname -sr  → Linux 6.18.48-109.150.amzn2023.x86_64
+[10:29:48] INFO      sh pwd        → /opt/WHS-Vuln-Web
+[10:29:48] INFO    [+] /bin/sh 컨텍스트에서 임의 명령 실행 확인 (ec2-user, 대상 ip-10-3-11-45.ap-northeast-2.compute.internal)
+[10:29:48] INFO  ================================================================
+[10:29:48] INFO    STEP 2 — 노출 SSH(T1133): private subnet — 연결 시도만
+[10:29:48] INFO  ================================================================
+[10:29:48] INFO    [+] 127.0.0.1:22 연결 시도 결과: SSH_OPEN
+[10:29:48] INFO        → 공인 IP 없어 실제 SSH 불가. VPC Flow Log 에 REJECT 증거만 남기는 흐름 유지
+[10:29:48] INFO  ================================================================
+[10:29:48] INFO    STEP 3 — 지속성(T1505.003): 쓰기 가능 위치에 마커
+[10:29:48] INFO  ================================================================
+[10:29:48] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal → ~/.bashrc ADDED
+[10:29:48] INFO    [=] 대상 1대에 마커 확인 — 재로그인 시 로딩되는 위치 시연
+[10:29:48] INFO        정리 절차 기록: recovery/persistence_marker.json
+[10:29:48] INFO  ================================================================
+[10:29:48] INFO    STEP 4 — T1486: 호스트 파일 변형 (시스템/앱 미접촉, 가역)
+[10:29:48] INFO  ================================================================
+[10:29:48] INFO  [payload] impact.sh (2791 bytes) 업로드
+[10:29:48] INFO  [upload] S3 저장됨 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/431e5fa1-7d0e-448f-b3dc-122eaae40eef--impact.sh (executable=True)
+[10:29:48] INFO    [+] impact.sh 업로드 key=whs-uploads/13d0d481-afb9-4c4a-a986-c2c69ce19bf4/431e5fa1-7d0e-448f-b3dc-122eaae40eef--impact.sh (run_id=1d0b593104db)
+[10:29:48] INFO        대상=/opt/whs-lab-data — base64 가역, 원본 .bak 보존, restore.sh 동시 생성
+[10:29:49] INFO    [+] ip-10-3-11-45.ap-northeast-2.compute.internal — 변형 3개: app-config.json, orders.csv, session.log
+[10:29:49] INFO    [=] 대상 1대 처리 완료
+[10:29:49] INFO        복구: python scenario3.py --restore (또는 호스트에서 sh /opt/whs-lab-data/restore.sh)
+[10:29:49] INFO        복구 매니페스트: recovery/impact_manifest.json
+[10:29:49] INFO  ================================================================
+[10:29:49] INFO    SCENARIO 3 종료
+[10:29:49] INFO    로그: scenario3/scenario3.log
+[10:29:49] INFO  ================================================================
+[10:29:49] WARNING 
+[10:29:49] WARNING [원상복구]  python scenario3.py --restore
+[10:29:49] WARNING   ip-10-3-11-45.ap-northeast-2.compute.internal 의 변형 파일·잔여물, ~/.bashrc 마커,
+[10:29:49] WARNING   S3 에 올린 impact.sh 를 한 번에 되돌린다.
+[10:29:54] INFO  ================================================================
+[10:29:54] INFO    SCENARIO 3 — OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 더미 랜섬
+[10:29:54] INFO    흐름도3 (WHS 실습) — 단일 인스턴스 대상
+[10:29:54] INFO  ================================================================
+[10:29:54] INFO  [auth] 정상 로그인 성공 — user=jeonis1018@gmail.com (13d0d481-afb9-4c4a-a986-c2c69ce19bf4)
+[10:29:54] INFO  [pin] 복구 대상 고정 — ip-10-3-11-45.ap-northeast-2.compute.internal (impact_manifest.json 기록)
+[10:29:54] INFO  ================================================================
+[10:29:54] INFO    RESTORE — 호스트 흔적 원상복구
+[10:29:54] INFO  ================================================================
+[10:29:54] INFO    [+] 4단계 변형 복구 — RESTORED_VERIFIED app-config.json | RESTORED_VERIFIED orders.csv | RESTORED_VERIFIED session.log
+[10:29:54] INFO    [+] 잔여물 제거 — 남은 파일: app-config.json | orders.csv | session.log
+[10:29:55] INFO    [+] 3단계 마커 제거 — 남은 개수: 0
+[10:29:55] INFO    [=] ip-10-3-11-45.ap-northeast-2.compute.internal 호스트 흔적 제거 완료
+[10:29:55] INFO  ================================================================
+[10:29:55] INFO    RESTORE — S3 업로드 객체 삭제
+[10:29:55] INFO  ================================================================
+[10:29:55] INFO    [+] 복구 전용 자격증명 사용 (RESTORE_AWS_* — 공격 경로 아님)
+[10:29:55] INFO    [+] 대상 3개 (버킷 whs-cloud9-vuln-web-lab-896986966760-ap-northeast-2-an)
+[10:29:55] INFO    [+] 삭제: impact.sh
+[10:29:55] INFO    [+] 삭제: impact.sh
+[10:29:55] INFO    [+] 삭제: impact.sh
+[10:29:55] INFO    [=] 삭제 3/3
+[10:29:56] INFO        기록 초기화: recovery/uploaded_objects.json
+[10:29:56] INFO  ================================================================
+[10:29:56] INFO    SCENARIO 3 복구 종료
+[10:29:56] INFO    로그: scenario3/scenario3.log
+[10:29:56] INFO  ================================================================

@@ -1,0 +1,3 @@
+# 대상 호스트에서 실행되는 스크립트는 항상 LF 로 유지한다.
+# CRLF 로 체크아웃되면 Linux 셸이 `$'\r': command not found` 로 죽는다.
+*.sh text eol=lf
