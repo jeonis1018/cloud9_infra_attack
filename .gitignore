@@ -25,6 +25,7 @@ attack/venv/
 
 # 복구 자료 (SSE-C 키·변경 매니페스트). 로컬에는 반드시 남기고, 절대 커밋하지 않는다.
 attack/*/recovery/
+attack/**/*.log
 
 # Python
 __pycache__/
