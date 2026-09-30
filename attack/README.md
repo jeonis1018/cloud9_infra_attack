@@ -1,305 +1,81 @@
-# Cloud9 Attack Chain
+# attack/ — 공격 시나리오 도구
 
-클라우드 취약 아키텍처 5단계 공격 시나리오.
+WHS-Cloud9-Vuln-Web(팀이 세운 취약 웹앱, https://whs4namu.click) 대상 공격 재현 도구.
 
-```
-SSRF → IMDS 자격증명 탈취 → 정찰 → 데이터 유출 → 탐지 회피 → SSE-C 재암호화
-```
+목적은 완벽한 공격 툴이 아니라 **방어 아키텍처와 탐지(GuardDuty / CloudTrail /
+VPC Flow Log / WAF / ELK) 테스트**다. 척도는 "공격이 정교한가"가 아니라
+"탐지 이벤트를 확실히·안전하게 발생시키고 흐름이 읽히는가"다.
 
----
-
-## 사전 준비
-
-### 1. 의존 패키지 설치
-
-```bash
-pip install -r attack/requirements.txt
-```
-
-### 2. 설정 파일 수정
-
-**`attack/config.py`**에서 아래 두 항목을 실제 값으로 교체한다.
-
-| 변수 | 설명 | 확인 방법 |
-|---|---|---|
-| `WEBAPP_URL` | 웹앱 엔드포인트 | `terraform output alb_dns_name` 또는 Route53 도메인 |
-| `TARGET_BUCKET` | 공격 대상 S3 버킷명 | `terraform output bucket_id` |
-
-### 3. IAM User 자격증명 설정 (Step 4~5용)
-
-Step 3에서 유출한 `config.json`의 `SecretAccessKey`는 더미값이다.  
-실제 IAM User 자격증명을 `attack/.env`에 기입한다.
-
-```bash
-cp attack/.env.example attack/.env
-# .env 파일을 열어 실제 값 입력
-```
-
-```dotenv
-IAM_ACCESS_KEY_ID=AKIA...
-IAM_SECRET_ACCESS_KEY=xxxx
-IAM_USER_NAME=WHS-Scenario-Persistence-User
-```
-
-> `.env`는 `.gitignore`에 등록되어 있으므로 커밋되지 않는다.
-
----
-
-## 전체 실행
-
-모든 단계를 순서대로 자동 실행한다.
-
-```bash
-# 기본 실행 (config.py 설정값 사용)
-python attack/run_all.py
-
-# URL·버킷을 직접 지정
-python attack/run_all.py \
-    --webapp-url https://whs4namu.click \
-    --bucket cloud9-attack-target-a1b2c3d4
-
-# IMDS 우회 페이로드를 무작위로 섞어서 시도 (WAF 로그 다양화)
-python attack/run_all.py --payload-mode random
-```
-
-### 특정 단계부터 재개
-
-이전 단계가 이미 성공한 경우 `--start-step`으로 중간 단계부터 시작할 수 있다.
-
-```bash
-# Step 3부터 재개 (임시 자격증명 주입 필요)
-python attack/run_all.py \
-    --start-step 3 \
-    --inject-access-key ASIA... \
-    --inject-secret-key wJalr... \
-    --inject-token IQoJb...
-
-# Step 4부터 재개 (임시 자격증명 + IAM User 자격증명 주입 필요)
-python attack/run_all.py \
-    --start-step 4 \
-    --inject-access-key ASIA... \
-    --inject-secret-key wJalr... \
-    --inject-token IQoJb... \
-    --inject-iam-access-key AKIA... \
-    --inject-iam-secret-key xxxx
-```
-
----
-
-## 단계별 실행
-
-각 단계를 독립적으로 실행할 수 있다. `attack/` 디렉터리를 기준으로 실행한다.
-
-```bash
-cd attack
-```
-
-### Step 1 — Initial Access & Credential Access
-
-SSRF 취약점(`GET /preview?url=`)을 통해 IMDS에 접근하고 EC2 임시 자격증명을 탈취한다.
-
-```bash
-python step1_initial_access.py
-
-# 웹앱 URL 직접 지정
-python step1_initial_access.py --webapp-url https://whs4namu.click
-
-# IMDS 우회 페이로드 무작위 모드
-python step1_initial_access.py --payload-mode random
-```
-
-**출력 예시:**
-```json
-{
-  "role_name": "cloud9-infra-attack-ec2-role",
-  "AccessKeyId": "ASIA...",
-  "SecretAccessKey": "wJalr...",
-  "Token": "IQoJb...",
-  "Expiration": "2026-09-06T12:00:00Z"
-}
-```
-
----
-
-### Step 2 — Discovery (정찰)
-
-탈취한 임시 자격증명으로 IAM 정책, EC2 인스턴스, S3 버킷 목록을 수집한다.
-
-```bash
-python step2_discovery.py \
-    --access-key ASIA... \
-    --secret-key wJalr... \
-    --token IQoJb...
-
-# IAM Role 이름 직접 지정 (기본값: cloud9-infra-attack-ec2-role)
-python step2_discovery.py \
-    --access-key ASIA... \
-    --secret-key wJalr... \
-    --token IQoJb... \
-    --role-name cloud9-infra-attack-ec2-role
-```
-
-**수집 항목:**
-- IAM: Role에 연결된 관리형·인라인 정책 문서
-- EC2: 인스턴스 목록, IAM 프로파일 연결 정보
-- S3: 전체 버킷 목록, `cloud9-attack-target` 접두사 버킷의 객체 목록
-
----
-
-### Step 3 — Exfiltration (데이터 유출)
-
-target 버킷에서 민감 파일을 로컬(`attack/exfiltrated/`)로 다운로드한다.
-
-```bash
-python step3_exfiltration.py \
-    --access-key ASIA... \
-    --secret-key wJalr... \
-    --token IQoJb... \
-    --bucket cloud9-attack-target-a1b2c3d4
-```
-
-**유출 파일:**
-
-| 파일 | 내용 |
-|---|---|
-| `customers.csv` | 고객 개인정보 |
-| `config.json` | IAM User 자격증명 (Step 4~5용) |
-| `flag.txt` | 시나리오 플래그 |
-
-> 다운로드된 파일은 `attack/exfiltrated/`에 저장된다.
-
----
-
-### Step 4 — Defense Evasion (탐지 회피)
-
-`config.json`에서 획득한 IAM User 자격증명으로 GuardDuty 탐지기를 비활성화한다.
-
-```bash
-# .env 파일에 자격증명이 있는 경우
-python step4_defense_evasion.py
-
-# 인자로 직접 지정
-python step4_defense_evasion.py \
-    --iam-access-key AKIA... \
-    --iam-secret-key xxxx
-```
-
----
-
-### Step 5 — Impact (SSE-C 재암호화)
-
-target 버킷의 모든 객체를 공격자 소유 키로 SSE-C 재암호화한다.  
-키 없이는 복호화가 불가능하다.
-
-```bash
-# .env 파일에 자격증명이 있는 경우
-python step5_impact.py --bucket cloud9-attack-target-a1b2c3d4
-
-# 인자로 직접 지정
-python step5_impact.py \
-    --iam-access-key AKIA... \
-    --iam-secret-key xxxx \
-    --bucket cloud9-attack-target-a1b2c3d4
-```
-
-**실행 순서:**
-1. 32바이트 AES 키 생성 → `attack/exfiltrated/sse_c.key` 저장
-2. 버킷 암호화 설정에서 SSE-C 차단 여부 확인 및 해제
-3. 버킷 내 전체 객체를 SSE-C 헤더로 자기 자신에게 복사(재업로드)
-
-> 생성된 키 파일을 분실하면 복호화 불가. `attack/exfiltrated/sse_c.key`를 보관할 것.
-
----
-
-## 파일 구조
+## 구조
 
 ```
 attack/
-├── config.py               # 공통 설정 (수정 필요)
-├── imds_payloads.py        # IMDS 우회 페이로드 목록
-├── run_all.py              # 전체 체인 실행 엔트리포인트
-├── step1_initial_access.py # SSRF → IMDS 자격증명 탈취
-├── step2_discovery.py      # IAM·EC2·S3 정찰
-├── step3_exfiltration.py   # S3 데이터 유출
-├── step4_defense_evasion.py# GuardDuty 비활성화
-├── step5_impact.py         # SSE-C 재암호화
-├── .env.example            # IAM User 자격증명 템플릿
-├── .env                    # 실제 자격증명 (gitignore)
-├── requirements.txt        # Python 의존 패키지
-└── exfiltrated/            # 유출 파일 저장 디렉터리 (자동 생성)
-    ├── customers.csv
-    ├── config.json
-    ├── flag.txt
-    └── sse_c.key
+├── common.py       웹앱 침투 프리미티브(WhsClient) + AWS fail-fast 래퍼 + 복구자료 관리
+├── payloads/       업로드해서 실행하는 스크립트 (MITRE 매핑은 payloads/README.md)
+├── scenario1/      SSRF → 자격증명 탈취 → S3 유출 → GuardDuty 무력화 → SSE-C 랜섬
+├── scenario2/      SQLi → RCE → 웹셸 지속성 → 리소스 하이재킹
+├── scenario3/      OS 커맨드 인젝션 → 호스트 셸 → 지속성 → 파일 변형
+└── legacy/         옛 Flask 대상 코드 (참고용 보존, 실행하지 않음)
 ```
 
----
+경계: **웹앱을 뚫는 데까지는 `common.py`, 그 뒤 클라우드·호스트 작업은 각 시나리오가 직접.**
 
-## 로그
+## 실행
 
-`run_all.py`로 전체 실행 시 `attack/attack_chain.log`에 전체 로그가 기록된다.  
-단계별 단독 실행 시에는 표준 출력으로만 확인 가능하다.
-
----
-
-## 공격 후 원상복구
-
-시나리오 종료 후 아래 순서로 복구한다.
-
-### 1. GuardDuty 재활성화 (Step 4 복구)
-
-Step 4에서 비활성화한 GuardDuty 탐지기를 다시 활성화한다.
+각 시나리오 디렉터리에서 `.env` 를 만들고 값을 채운 뒤 실행한다.
 
 ```bash
-# 탐지기 ID 확인
-aws guardduty list-detectors --region ap-northeast-2
-
-# 탐지기 재활성화
-aws guardduty update-detector \
-    --region ap-northeast-2 \
-    --detector-id <detector-id> \
-    --enable
+cd scenario1 && cp .env.example .env
+python scenario1.py             # 공격
+python scenario1.py --restore   # 복구
 ```
 
-### 2. S3 객체 복원 (Step 5 복구)
+셋 다 같은 모양이고 순서는 상관없다. 각 시나리오가 자기가 바꾼 것만 되돌린다.
 
-Step 5에서 SSE-C로 재암호화된 객체를 원래 상태로 되돌린다.  
-`envs/before/` (또는 `envs/after/`) 에서 Terraform을 재적용하면 `aws_s3_object.dummy_data` 리소스가 원본 파일을 덮어쓴다.
+| 시나리오 | 남기는 것 | 상세 |
+|---|---|---|
+| 1 | S3 객체 암호화, 버킷 SSE-C 차단 해제, GuardDuty OFF | [scenario1/README.md](scenario1/README.md) |
+| 2 | S3 업로드 객체(웹셸) | [scenario2/README.md](scenario2/README.md) |
+| 3 | 호스트 파일 변형, bashrc 마커, S3 업로드 객체 | [scenario3/README.md](scenario3/README.md) |
 
-```bash
-cd envs/before
-terraform apply
+## `.env` 는 공격/복구로 나뉜다
+
+각 `.env.example` 이 두 블록으로 갈려 있다.
+
+- **공격** — 웹앱 로그인, 대상 버킷, 탈취당한 것으로 치는 `PERSIST_AWS_*` 등
+- **복구 전용** — `RESTORE_AWS_*`. **공격 단계는 이 키를 절대 쓰지 않는다.**
+
+복구는 공격자가 아니라 실습 운영자의 일이라 **다른 IAM User** 를 쓴다.
+CloudTrail 에서도 공격 행위와 뒷정리가 다른 principal 로 구분된다.
+
+## 복구하지 않으면 다시 실행되지 않는다
+
+이전 실행을 되돌리지 않은 채 또 돌리면 복구 자료(SSE-C 키, GuardDuty 이전 상태 등)를
+덮어써서 원래대로 못 돌아간다. 그래서 진입 시점에 막는다.
+
+```
+[!] 이전 실행이 아직 복구되지 않았다:
+      - SSE-C 로 잠긴 S3 객체가 남아 있다  (recovery/encrypted_objects.json)
+    먼저 복구를 끝내고 다시 실행할 것:  python scenario1.py --restore
 ```
 
-> Terraform apply 없이 수동 복원이 필요한 경우, SSE-C 복호화에 `attack/exfiltrated/sse_c.key`가 필요하다. 키 파일을 분실했다면 수동 복원 불가 — Terraform apply로만 복구 가능하다.
+웹앱에 요청 한 번 보내기 전에 중단하므로, 실수로 두 번 돌려도 상태가 나빠지지 않는다.
 
-### 3. SSE-C 차단 설정 복원 (Step 5 복구)
+## 설계 원칙
 
-Step 5에서 SSE-C 차단이 해제된 경우(`ssec_block_removed: true`), 버킷 암호화 설정을 원래대로 되돌린다.
+- **직선 실행** — 환경이 세팅됐다고 가정하고 분기 없이 끝까지 간다.
+- **fail-fast** — 예상 밖 결과는 삼키지 않고 어디서 멈췄는지만 남기고 종료한다.
+- **예상된 차단은 산출물** — 정책 Deny 는 버그가 아니라 CloudTrail 증거다.
+  `aws(..., expect=(DENY,))` 로 명시해 통과시킨다.
+- **복구 자료는 동작 전에 저장** — 상태를 바꾸기 전에 키·대상목록을 `recovery/` 에
+  쓰고 되읽어 검증한다. 저장에 실패하면 한 객체도 건드리지 않는다.
+- **단일 대상 고정** — scenario2/3 은 로그인 직후 인스턴스 1대를 잡고 모든 단계를
+  그 한 대에서만 실행한다. ALB 가 라운드로빈이라 단계마다 따로 요청하면 흔적이
+  양쪽에 흩어진다. 대상이 아니면 셸 가드가 아무것도 실행하지 않고 빠진다.
 
-```bash
-aws s3api put-bucket-encryption \
-    --region ap-northeast-2 \
-    --bucket <target-bucket-name> \
-    --server-side-encryption-configuration '{
-        "Rules": [{
-            "ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "AES256"},
-            "BucketKeyEnabled": false,
-            "BlockedEncryptionTypes": {"EncryptionType": ["SSE-C"]}
-        }]
-    }'
-```
+## 로컬 정리 체크리스트
 
-> Step 5 실행 결과의 `ssec_block_removed` 값이 `false`이면 원래 차단 설정이 없었던 것이므로 이 단계는 건너뛴다.
-
-### 4. 로컬 파일 정리
-
-공격 중 생성된 로컬 파일을 삭제한다.
-
-```bash
-# 유출 파일 및 SSE-C 키 삭제
-rm -rf attack/exfiltrated/
-
-# 공격 로그 삭제
-rm -f attack/attack_chain.log
-```
+- [ ] `scenario*/recovery/` — **복구 완료를 확인한 뒤에만** 삭제 (키를 먼저 지우면 복구 불가)
+- [ ] `scenario1/exfiltrated/` — 유출 데이터 삭제
+- [ ] `scenario*/*.log` — 보고서용으로 보관하거나 삭제
+- [ ] `scenario*/.env` — 커밋되지 않았는지 확인 (`.gitignore` 처리됨)
