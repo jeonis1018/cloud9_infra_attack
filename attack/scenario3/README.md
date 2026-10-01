@@ -54,6 +54,11 @@ python scenario3.py --restore   # 전부 되돌림
 4) S3 impact.sh     운영자 자격증명으로 삭제
 ```
 
+2번은 **`.locked` 가 하나도 안 남았을 때만** 실행된다. 복호가 덜 끝났는데 `.bak` 까지
+지우면 원본이 영구히 사라지기 때문이다. 남아 있으면 `.bak` 을 보존한 채 중단하고
+수동 복구 명령을 띄운다. 실제로 `restore.sh` 가 없어진 상태에서 정리만 돌아
+더미 3개를 날린 적이 있다.
+
 대상 호스트는 `recovery/impact_manifest.json` 의 `target_host` 에서 읽고, 없으면
 `persistence_marker.json` 으로 폴백한다. 새로 고정하지 않는 이유는 ALB 가 다른
 인스턴스를 주면 공격한 곳이 아닌 데서 복구하게 되기 때문이다.
