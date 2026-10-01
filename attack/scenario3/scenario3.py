@@ -149,17 +149,35 @@ def step5_restore(c: WhsClient) -> None:
     호스트에 남긴 흔적을 전부 되돌린다.
       4단계 변형 → restore.sh 실행 → 잔여물(.bak/restore.sh/NOTE.txt) 제거
       3단계 마커 → ~/.bashrc 에서 삭제
+
+    잔여물 제거는 .locked 가 하나도 안 남았을 때만 한다. 복호가 덜 끝난 상태에서
+    .bak 을 지우면 원본이 사라진다.
     """
     banner(LOG, "RESTORE — 호스트 흔적 원상복구")
 
     out = c.on_target(f"sh {DUMMY_DIR}/restore.sh 2>&1", label="restore.sh")
     LOG.info("  [+] 4단계 변형 복구 — %s", out.replace("\n", " | ") or "(출력 없음)")
 
-    # restore.sh 는 .locked 만 지운다. 공격이 만든 나머지도 치운다.
-    left = c.on_target(
-        f"cd {DUMMY_DIR} && rm -f *.bak *.locked restore.sh NOTE.txt; ls",
-        label="잔여물 정리")
-    LOG.info("  [+] 잔여물 제거 — 남은 파일: %s", left.replace("\n", " | ") or "(없음)")
+    # 잔여물을 지우기 전에 .locked 가 남아 있는지 확인한다.
+    # 남아 있으면 복호가 끝나지 않은 것이고, 이 상태에서 .bak 까지 지우면 원본이
+    # 영구히 사라진다. restore.sh 가 없어진 채로 정리만 돌아 더미를 날린 적이 있다.
+    probe = c.on_target(f"ls {DUMMY_DIR}/*.locked 2>/dev/null; echo END",
+                        label=".locked 확인")
+    still = [ln.strip() for ln in probe.splitlines() if ln.strip().endswith(".locked")]
+
+    if still:
+        LOG.error("  [!] 복호되지 않은 파일 %d개 — 잔여물을 지우지 않는다(.bak 보존).", len(still))
+        for f in still:
+            LOG.error("      %s", f)
+        LOG.error("      원본은 .bak 에 있다. 호스트에서 직접 되돌릴 것:")
+        LOG.error("      sh " + DUMMY_DIR + "/restore.sh")
+        LOG.error("      (restore.sh 가 없으면)  cd " + DUMMY_DIR
+                  + " && for f in *.bak; do mv \"$f\" \"${f%.bak}\"; done")
+    else:
+        left = c.on_target(
+            f"cd {DUMMY_DIR} && rm -f *.bak restore.sh NOTE.txt; ls",
+            label="잔여물 정리")
+        LOG.info("  [+] 잔여물 제거 — 남은 파일: %s", left.replace("\n", " | ") or "(없음)")
 
     # 3단계 마커 제거. 기록이 없으면 기본 마커로 시도한다.
     path = HERE / "recovery" / "persistence_marker.json"
@@ -171,6 +189,14 @@ def step5_restore(c: WhsClient) -> None:
         f"sed -i '/{marker}/d' ~/.bashrc; grep -cF '{marker}' ~/.bashrc || true",
         label="bashrc 마커 제거")
     LOG.info("  [+] 3단계 마커 제거 — 남은 개수: %s", res.strip() or "0")
+
+    # 마커까지는 지우고 중단한다. 복구 기록을 남겨둬야 다음 실행이 막히고,
+    # 사람이 .bak 을 확인하기 전에 자동 정리가 또 돌지 않는다.
+    if still:
+        raise SystemExit(
+            "[!] 중단: 4단계 변형이 복구되지 않았다. 위 안내대로 호스트에서 되돌린 뒤\n"
+            "    다시 python scenario3.py --restore 를 실행할 것.")
+
     LOG.info("  [=] %s 호스트 흔적 제거 완료", c.target_host)
 
     # 호스트를 되돌렸으니 호스트 쪽 미복구 표시를 먼저 지운다.
