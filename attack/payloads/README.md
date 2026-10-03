@@ -14,6 +14,7 @@
 | `probe.sh` | scenario2 2단계 | T1082 System Information Discovery | 없음 (읽기 전용) | 해당 없음 |
 | `persist.sh` | scenario2 3단계 | T1505.003 Web Shell | 없음 (S3에 파일이 남는 것 자체가 지속성) | 업로드 객체 삭제로 제거 |
 | `impact.sh` | scenario3 4단계 | T1486 Data Encrypted for Impact | `/opt/whs-lab-data/` 더미만 | **완전 가역** (`restore.sh`, `.bak`) |
+| `dnscheck.sh` | scenario2 6단계 | — (방어 검증) | 없음 (읽기 전용) | 해당 없음 |
 
 ## 규약
 
